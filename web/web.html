@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>點餐推薦</title>
+<link rel="stylesheet" href="/web/web.css">
+
+<h1>點餐推薦</h1>
+<div id="log">請輸入需求（例如：預算1000、不辣、要有飲料）。</div>
+<div id="bar">
+  <input id="input" placeholder="輸入需求..." />
+  <button id="send">送出</button>
+</div>
+<script>
+  const sid = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now());
+  const log = document.getElementById('log');
+  const input = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+
+  async function send() {
+    const text = input.value.trim(); //trim()移除字串起始及結尾處的空白字元
+    if (!text) return;
+    input.value = '';
+    log.textContent += `\n\n> ${text}`;
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ sessionId: sid, text })
+      });
+      const data = await res.json();
+      log.textContent += `\n\n>> ${data.reply}`;
+      log.scrollTop = log.scrollHeight;
+    } catch (e) {
+      log.textContent += `\n\n[錯誤] 無法連線後端：${e}`;
+    }
+  }
+  sendBtn.onclick = send;
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+</script>
