@@ -1,7 +1,7 @@
-# ...existing code...
+
 import os, json, re, shutil, subprocess, random, time
 from typing import Any, Dict, List, Optional, Tuple
-
+from db_client import query_menu
 #從環境變數讀取設定
 DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
 OLLAMA_BIN = os.getenv("OLLAMA_BIN", "ollama")
@@ -100,200 +100,54 @@ def _extract_json(text: str) -> Any:
     return None
 
 def recommend(menu: Dict[str, Any], prefs: Optional[Dict[str, Any]] = None, top_k: int = 5, model: Optional[str] = None) -> Dict[str, Any]:
+    """
+    改用 SQL Server 進行推薦，取代原本的本地權重/多樣性邏輯。
+    透過 query_menu(budget, must_tags, exclude_tags) 從資料庫取得候選清單。
+    """
     prefs = prefs or {}
-    # 先嘗試模型
-    try:
-        system_prompt = "你是餐廳點餐助理，請依菜單與偏好推薦，並以服務生客氣的語氣回答所推薦的餐點。"
-        payload = {"menu": menu, "prefs": prefs, "top_k": top_k}
-        reply = chat(
-            [{"role": "system", "content": system_prompt},
-             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
-            model=model,
-        )
-        obj = _extract_json(reply)
-        if isinstance(obj, dict) and "items" in obj:
-            return obj
-        raise RuntimeError("模型回覆不是有效 JSON")
-    except Exception:
-        # 備用規則：動態權重 + 總預算約束 + 多樣性 
-        weights: Dict[str, float] = dict(prefs.get("weights", {})) if isinstance(prefs.get("weights"), dict) else {}
-        W_PRICE = float(weights.get("price", 0.5))
-        W_MAIN = float(weights.get("main", 0.5))
-        W_VAR = float(weights.get("variety", 0.3))
-        W_DRINK = float(weights.get("drink", -0.3))
-        W_SPICE = float(weights.get("spice", 0.2))
-        W_CATE = float(weights.get("category", 0.4))
-        W_CUIS = float(weights.get("cuisine", 0.0))
 
-        budget: Optional[float] = None
-        if isinstance(prefs.get("budget"), (int, float, str)):
-            try:
-                budget = float(prefs["budget"])  # type: ignore
-            except Exception:
-                budget = None
-        want_spice = prefs.get("spiceLevel")
-        excludes = [str(x) for x in prefs.get("excludes", [])] if isinstance(prefs.get("excludes"), list) else []
-        need_drink = bool(prefs.get("needDrink"))
-        cuisine = prefs.get("cuisine")
-        people = 0
+    # 1) 解析偏好 → 轉成查詢條件
+    budget: Optional[float] = None
+    if isinstance(prefs.get("budget"), (int, float, str)):
         try:
-            if isinstance(prefs.get("people"), (int, float, str)):
-                people = int(float(prefs["people"]))
+            budget = float(prefs["budget"])  # type: ignore[index]
         except Exception:
-            people = 0
+            budget = None
 
-        seed_text = f"{prefs.get('notes','')}|{budget}|{need_drink}|{want_spice}|{excludes}|{cuisine}|{people}|{weights}"
-        random.seed(seed_text)
+    must_tags: List[str] = []  # 預留未來需要「必須包含」的標籤
+    exclude_tags: List[str] = []
+    if isinstance(prefs.get("excludes"), list):
+        exclude_tags = [str(x) for x in prefs["excludes"]]  # type: ignore[index]
+    # 不辣 → 排除含「辣」的品項
+    if prefs.get("spiceLevel") == "不辣":
+        exclude_tags.append("辣")
 
-        def is_bev(cat_name: str) -> bool:
-            cat_name = str(cat_name or "")
-            return any(kw in cat_name for kw in ["酒", "啤酒", "清酒", "紅酒", "果汁", "茶", "飲料"])
+    # 2) 呼叫資料庫
+    try:
+        rows = query_menu(budget=budget, must_tags=must_tags, exclude_tags=exclude_tags)
+    except Exception as e:
+        return {"items": [], "notes": f"資料庫查詢失敗：{e}"}
 
-        CATEGORY_BASE = {
-            "經典鍋物": 5,
-            "明火好味": 5,
-            "潮粵燒臘": 4,
-            "生冷美饌": 3,
-            "手作小菜": 2,
-            "水果甜品": 1,
-        }
+    if not rows:
+        return {"items": [], "notes": "找不到符合預算或口味的餐點"}
 
-        def base_cat_weight(name: str) -> float:
-            if is_bev(name):
-                return -2.0 if not need_drink else 1.0
-            return float(CATEGORY_BASE.get(name, 2))
+    # 3) 整理回傳格式（只取前 top_k 筆）
+    items: List[Dict[str, Any]] = []
+    for row in rows[:top_k]:
+        # 兼容 Row/dict 兩種取值方式
+        getv = (row.get if hasattr(row, "get") else lambda k, d=None: getattr(row, k, d))
+        name = getv("ProductName")
+        price = getv("Price")
+        category = getv("CategoryName")
+        try:
+            price = None if price in (None, "", "時價") else float(price)
+        except Exception:
+            pass
+        items.append({
+            "name": name,
+            "price": price,
+            "category": category,
+            "reason": "依據您的需求精選推薦",
+        })
 
-        def allowed(cat_name: str, it: Dict[str, Any]) -> bool:
-            nm = str(it.get("name", ""))
-            if excludes and any(x and x in nm for x in excludes):
-                return False
-            tags = it.get("tags") or []
-            if excludes and any(x for x in excludes if any(x in str(t) for t in tags)):
-                return False
-            if want_spice == "不辣" and any(("辣" in str(t)) for t in (tags or [])):
-                return False
-            return True
-
-        # 建候選，計算基礎分數
-        candidates: List[Tuple[str, Dict[str, Any], float]] = []
-        for cat in menu.get("categories", []):
-            cat_name = str(cat.get("name", ""))
-            cat_w = base_cat_weight(cat_name)
-            for it in (cat.get("items") or []):
-                if not isinstance(it, dict) or not allowed(cat_name, it):
-                    continue
-                pr = it.get("price")
-                # 價格分數：越便宜越高，None/0 視為中間
-                if pr in (None, 0):
-                    price_score = 0.5
-                else:
-                    try:
-                        price_score = max(0.0, 1.0 - min(float(pr), 3000.0) / 3000.0)
-                    except Exception:
-                        price_score = 0.5
-                score = 0.0
-                score += W_CATE * cat_w
-                score += W_MAIN * (1.0 if cat_w >= 4 else 0.3)
-                score += W_PRICE * price_score
-                if is_bev(cat_name):
-                    score += W_DRINK  # 正或負
-                # 不辣加分
-                if want_spice == "不辣":
-                    tags = it.get("tags") or []
-                    if not any(("辣" in str(t)) for t in (tags or [])):
-                        score += W_SPICE
-                # 菜系偏好
-                if cuisine and (cuisine in str(it.get("name","")) or cuisine in (it.get("tags") or [])):
-                    score += W_CUIS
-                # 輕度打散
-                score += random.uniform(0, 0.3)
-                candidates.append((cat_name, it, score))
-
-        if not candidates:
-            return {"items": [], "notes": ""}
-
-        # 逐步挑選：兼顧總預算與多樣性（類別重覆懲罰）
-        target_k = top_k
-        if people and isinstance(people, int) and people > 0:
-            target_k = min(top_k, max(people, 2))
-
-        picked: List[Tuple[str, Dict[str, Any]]] = []
-        total_cost = 0.0
-        cat_counts: Dict[str, int] = {}
-
-        def can_add(cat_name: str, it: Dict[str, Any]) -> bool:
-            pr = it.get("price")
-            if budget is not None and pr not in (None, 0):
-                try:
-                    price = float(pr)
-                except Exception:
-                    return False
-                if total_cost + price > budget:
-                    return False
-            return True
-
-        def do_add(cat_name: str, it: Dict[str, Any]) -> None:
-            nonlocal total_cost
-            pr = it.get("price")
-            if budget is not None and pr not in (None, 0):
-                try:
-                    total_cost += float(pr)
-                except Exception:
-                    pass
-            picked.append((cat_name, it))
-            cat_counts[cat_name] = cat_counts.get(cat_name, 0) + 1
-
-        # 若需要飲料，先保證一杯可負擔的飲品
-        if need_drink:
-            bev_list = [(c, it, s) for (c, it, s) in candidates if is_bev(c)]
-            bev_list.sort(key=lambda x: (1e9 if x[1].get("price") in (None, 0) else float(x[1].get("price")), -x[2]))
-            for c, it, _ in bev_list:
-                if can_add(c, it):
-                    do_add(c, it)
-                    break
-
-        # 迭代挑選其餘項目：每輪根據當前已選給相同分類扣分
-        while len(picked) < target_k:
-            best = None
-            best_score = -1e9
-            for c, it, base in candidates:
-                if any(it is p_it for _, p_it in picked):
-                    continue
-                adj = base - W_VAR * 1.5 * float(cat_counts.get(c, 0))
-                if adj > best_score and can_add(c, it):
-                    best_score = adj
-                    best = (c, it)
-            if best is None:
-                break
-            do_add(best[0], best[1])
-
-        # 若因預算太低一個都選不到，保底挑最便宜
-        if not picked and candidates:
-            cheapest = min(candidates, key=lambda x: (1e9 if x[1].get("price") in (None, 0) else float(x[1].get("price"))))
-            picked.append((cheapest[0], cheapest[1]))
-
-        items: List[Dict[str, Any]] = []
-        for cat_name, it in picked[:target_k]:
-            pr = it.get("price")
-            reason_bits: List[str] = []
-            if budget is not None and pr not in (None, 0):
-                try:
-                    reason_bits.append("符合總預算" if float(pr) <= budget else "價格折衷")
-                except Exception:
-                    pass
-            if need_drink and is_bev(cat_name):
-                reason_bits.append("包含飲品")
-            if want_spice == "不辣":
-                reason_bits.append("口味清爽")
-            if base_cat_weight(cat_name) >= 4:
-                reason_bits.append("主菜優先")
-            if not reason_bits:
-                reason_bits.append("綜合評估推薦")
-            items.append({
-                "name": it.get("name"),
-                "price": pr,
-                "category": cat_name,
-                "reason": "、".join(reason_bits),
-            })
-
-        return {"items": items, "notes": ""}
+    return {"items": items, "notes": ""}
