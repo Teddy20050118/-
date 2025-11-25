@@ -67,7 +67,7 @@ def _cli_run(args: List[str], input_text: Optional[str] = None, timeout: float =
 
 # 導入 Ollama 封裝
 try:
-    from utils.ollama_fuc import (
+    from ollama_fuc import (
         recommend as ollama_recommend,
         chat as ollama_chat,
         ensure_daemon as ollama_ensure_daemon,
@@ -347,6 +347,7 @@ def generate_conversation(
     try:
         if ollama_recommend is None:
             raise RuntimeError("推薦功能未載入")
+           # reply="123" #///////////////////////////////////
         rec = ollama_recommend(menu, prefs, top_k=5, model=model)
         reply = format_recommend_text(rec)
     except Exception as e:

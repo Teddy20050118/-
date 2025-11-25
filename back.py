@@ -24,7 +24,7 @@ app.add_middleware(
 app.mount("/web", StaticFiles(directory=os.path.join(BASE_DIR, "web")), name="web")
 
 # 載入菜單
-MENU_PATH = os.path.join(BASE_DIR, "utils", "menu.json")
+MENU_PATH = os.path.join(BASE_DIR, "db", "menu.json")
 with open(MENU_PATH, "r", encoding="utf-8") as f:
     menu: Menu = json.load(f) #把JSON讀成Python物件並存到menu
 _validate_menu(menu)

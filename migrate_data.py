@@ -19,7 +19,7 @@ def migrate():
     
     if not os.path.exists(json_path):
         # 備用路徑檢查，依據你提供的檔案結構
-        json_path = os.path.join(base_dir, 'utils', 'menu.json')
+        json_path = os.path.join(base_dir, 'db', 'menu.json')
 
     with open(json_path, 'r', encoding='utf-8') as f:
         menu_data = json.load(f)

@@ -131,23 +131,48 @@ def recommend(menu: Dict[str, Any], prefs: Optional[Dict[str, Any]] = None, top_
     if not rows:
         return {"items": [], "notes": "找不到符合預算或口味的餐點"}
 
-    # 3) 整理回傳格式（只取前 top_k 筆）
+    # 3) 嚴格控制合計不超過預算（貪婪累加）
+    MARKET_PRICE_ASSUME = 350.0  # 時價估值，可調
     items: List[Dict[str, Any]] = []
-    for row in rows[:top_k]:
-        # 兼容 Row/dict 兩種取值方式
-        getv = (row.get if hasattr(row, "get") else lambda k, d=None: getattr(row, k, d))
-        name = getv("ProductName")
-        price = getv("Price")
-        category = getv("CategoryName")
+    total = 0.0
+    for row in rows:
+        name = row.get("ProductName")
+        price = row.get("Price")
+        category = row.get("CategoryName")
         try:
-            price = None if price in (None, "", "時價") else float(price)
+            p = None if price in (None, "", "時價") else float(price)
         except Exception:
-            pass
+            p = None
+
+        # 對時價：要嘛跳過、要嘛用估值；這裡以估值參與預算
+        if p is None or p == 0:
+            p = MARKET_PRICE_ASSUME
+
+        # 若有預算，確保合計不超標
+        if isinstance(budget, (int, float)) and budget > 0:
+            if total + p > float(budget):
+                continue
+
         items.append({
             "name": name,
-            "price": price,
+            "price": (None if price in (None, 0, "", "時價") else float(price)),
             "category": category,
             "reason": "依據您的需求精選推薦",
         })
+        total += p
+        if len(items) >= top_k:
+            break
 
-    return {"items": items, "notes": ""}
+    # 若因預算太嚴選不到，退而求其次：挑最便宜的前 top_k（不控合計）
+    if not items:
+        rows_sorted = sorted(rows, key=lambda r: (float(r.get("Price") or 1e9)))
+        for row in rows_sorted[:top_k]:
+            items.append({
+                "name": row.get("ProductName"),
+                "price": (None if row.get("Price") in (None, 0, "", "時價") else float(row.get("Price"))),
+                "category": row.get("CategoryName"),
+                "reason": "綜合評估推薦",
+            })
+
+    notes = "" if items else "找不到符合預算的組合"
+    return {"items": items, "notes": notes}

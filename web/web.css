@@ -1,113 +1,229 @@
 :root {
-  --bg: #f5f7fb;
-  --card: #ffffff;
-  --text: #1f2328;
-  --muted: #6b7280;
-  --primary: #2563eb;
-  --primary-600: #1d4ed8;
-  --accent: #10b981;
-  --border: #e5e7eb;
-  --radius: 12px;
-  --shadow: 0 10px 25px rgba(0,0,0,.06);
+  --bg-color: #f0f2f5;
+  --header-bg: #ffffff;
+  --primary-color: #0084ff; /* Messenger Blue */
+  --primary-hover: #0073e6;
+  --user-msg-bg: #0084ff;
+  --user-msg-text: #ffffff;
+  --bot-msg-bg: #e4e6eb;
+  --bot-msg-text: #050505;
+  --input-bg: #ffffff;
+  --text-main: #333;
+  --text-sub: #65676b;
+  --shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
+
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b1220;
-    --card: #0f172a;
-    --text: #e5e7eb;
-    --muted: #94a3b8;
-    --primary: #60a5fa;
-    --primary-600: #3b82f6;
-    --accent: #34d399;
-    --border: #223049;
-    --shadow: 0 8px 24px rgba(0,0,0,.35);
+    --bg-color: #18191a;
+    --header-bg: #242526;
+    --primary-color: #2e89ff;
+    --user-msg-bg: #2e89ff;
+    --bot-msg-bg: #3a3b3c;
+    --bot-msg-text: #e4e6eb;
+    --input-bg: #242526;
+    --text-main: #e4e6eb;
+    --text-sub: #b0b3b8;
   }
 }
-* { box-sizing: border-box; }
-html, body { height: 100%; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(37,99,235,.08), transparent 60%),
-    radial-gradient(900px 450px at 100% 0%, rgba(16,185,129,.09), transparent 60%),
-    var(--bg);
-  color: var(--text);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  overflow: hidden; /* 防止整個頁面滾動 */
 }
-h1 {
-  margin: 24px auto 12px;
-  max-width: 780px;
-  padding: 0 16px;
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: .2px;
+
+/* 主容器：模擬手機 App 介面 */
+.app-container {
+  width: 100%;
+  max-width: 800px; /* 限制最大寬度，大螢幕看起來更舒服 */
+  background: var(--bg-color);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  box-shadow: 0 0 20px rgba(0,0,0,0.05);
 }
-#log {
-  max-width: 780px;
-  margin: 0 auto;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+
+/* 標題列 */
+header {
+  background: var(--header-bg);
+  padding: 15px 20px;
+  text-align: center;
   box-shadow: var(--shadow);
-  padding: 16px 18px;
-  min-height: 260px;
-  white-space: pre-wrap;
-  line-height: 1.6;
-  color: var(--text);
+  z-index: 10;
+}
+
+header h1 {
+  font-size: 1.2rem;
+  margin-bottom: 4px;
+}
+
+header .subtitle {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+}
+
+/* 聊天區域 */
+#chat-box {
+  flex: 1;
   overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  scroll-behavior: smooth;
 }
-#log .hint, #log .system { color: var(--muted); }
-#bar {
-  max-width: 780px;
-  margin: 12px auto 28px;
-  padding: 0 0;
-  display: flex; gap: 10px;
+
+/* 訊息共用樣式 */
+.message {
+  display: flex;
+  align-items: flex-end;
+  max-width: 85%;
+  animation: fadeIn 0.3s ease;
 }
-#input {
-  flex: 1; padding: 12px 14px;
-  border-radius: calc(var(--radius) - 4px);
-  border: 1px solid var(--border);
-  background: var(--card); color: var(--text);
-  font-size: 16px; outline: none;
-  transition: border-color .2s, box-shadow .2s, background .2s;
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-#input::placeholder { color: var(--muted); }
-#input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+
+/* 機器人訊息 (靠左) */
+.message.bot {
+  align-self: flex-start;
 }
-button, #send {
+
+.message.bot .avatar {
+  width: 36px;
+  height: 36px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  font-size: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid var(--bot-msg-bg);
+}
+
+.message.bot .bubble {
+  background-color: var(--bot-msg-bg);
+  color: var(--bot-msg-text);
+  border-radius: 18px 18px 18px 4px;
+}
+
+/* 使用者訊息 (靠右) */
+.message.user {
+  align-self: flex-end;
+  flex-direction: row-reverse; /* 為了保持結構一致，若有頭像可放 */
+}
+
+.message.user .bubble {
+  background-color: var(--user-msg-bg);
+  color: var(--user-msg-text);
+  border-radius: 18px 18px 4px 18px;
+}
+
+/* 氣泡本體 */
+.bubble {
   padding: 12px 16px;
-  border-radius: calc(var(--radius) - 6px);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
-  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 16%, #fff), var(--primary));
-  color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--primary) 25%, transparent);
-  transition: transform .05s, filter .2s, box-shadow .2s;
+  line-height: 1.5;
+  font-size: 0.95rem;
+  word-wrap: break-word;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
-button:hover, #send:hover {
-  filter: saturate(1.05) brightness(1.02);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--primary) 32%, transparent);
+
+/* 底部輸入區 */
+#input-area {
+  background: var(--header-bg);
+  padding: 15px 20px;
+  /* box-shadow: 0 -2px 10px rgba(0,0,0,0.05); */
 }
-button:active, #send:active { transform: translateY(1px); }
-#log::-webkit-scrollbar { width: 10px; }
-#log::-webkit-scrollbar-track { background: transparent; }
-#log::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--primary) 25%, var(--border));
-  border-radius: 8px; border: 2px solid transparent; background-clip: padding-box;
+
+.input-wrapper {
+  display: flex;
+  background: var(--bg-color);
+  border-radius: 24px;
+  padding: 5px 5px 5px 20px;
+  align-items: center;
+  border: 1px solid transparent;
+  transition: border 0.2s;
 }
-code, kbd {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  background: color-mix(in srgb, var(--card) 80%, var(--border));
-  border: 1px solid var(--border);
-  padding: .15rem .35rem; border-radius: 6px; color: var(--text);
+
+.input-wrapper:focus-within {
+  border-color: var(--primary-color);
+  background: var(--header-bg);
 }
-@media (max-width: 840px) {
-  h1 { padding: 0 12px; font-size: 22px; }
-  #log { margin: 0 12px; }
-  #bar { margin: 12px; }
-  #input { font-size: 15px; }
-  button, #send { font-size: 15px; padding: 11px 14px; }
+
+#input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 10px 0;
+  font-size: 16px;
+  color: var(--text-main);
+  outline: none;
+}
+
+#send-btn {
+  background: var(--primary-color);
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.2s;
+  margin-left: 10px;
+}
+
+#send-btn:hover {
+  background: var(--primary-hover);
+  transform: scale(1.05);
+}
+
+#send-btn:active {
+  transform: scale(0.95);
+}
+
+/* 載入中動畫 (三個跳動的點) */
+.hidden { display: none !important; }
+
+.bubble.loading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 15px 20px;
+}
+
+.bubble.loading span {
+  width: 8px;
+  height: 8px;
+  background: #9ca3af;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.bubble.loading span:nth-child(1) { animation-delay: -0.32s; }
+.bubble.loading span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* 針對推薦菜單的簡單樣式 */
+strong {
+  font-weight: 700;
+  color: var(--primary-color);
 }

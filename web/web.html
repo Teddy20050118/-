@@ -1,25 +1,110 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>點餐推薦</title>
-<link rel="stylesheet" href="/web/web.css">
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>點餐助理</title>
+  <link rel="stylesheet" href="/web/web.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
 
-<h1>點餐推薦</h1>
-<div id="log">請輸入需求（例如：預算1000、不辣、要有飲料）。</div>
-<div id="bar">
-  <input id="input" placeholder="輸入需求..." />
-  <button id="send">送出</button>
-</div>
+  <div class="app-container">
+    <header>
+      <h1> 點餐助理</h1>
+    </header>
+
+    <div id="chat-box">
+      <div class="message bot">
+        <div class="avatar">🤖</div>
+        <div class="bubble">
+          你好！我是你的點餐助理。<br>
+          請告訴我你的需求，例如：「<b>預算 300 元，想吃不辣的</b>」或「<b>5個人聚餐，要有飲料</b>」。
+        </div>
+      </div>
+    </div>
+
+    <div id="loading-indicator" class="message bot hidden">
+      <div class="avatar">🤖</div>
+      <div class="bubble loading">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <div id="input-area">
+      <div class="input-wrapper">
+        <input id="input" type="text" placeholder="輸入你的需求..." autocomplete="off" />
+        <button id="send-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
 <script>
   const sid = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now());
-  const log = document.getElementById('log');
+  const chatBox = document.getElementById('chat-box');
   const input = document.getElementById('input');
-  const sendBtn = document.getElementById('send');
+  const sendBtn = document.getElementById('send-btn');
+  const loading = document.getElementById('loading-indicator');
+
+  // 簡單的文字轉 HTML 處理 (處理換行與粗體)
+  function formatText(text) {
+    if (!text) return "";
+    // 將換行符號轉為 <br>
+    let html = text.replace(/\n/g, '<br>');
+    // 將 **文字** 轉為 <strong>文字</strong> (簡單 Markdown)
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    return html;
+  }
+
+  function appendMessage(role, text) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${role}`;
+    
+    let contentHtml = '';
+    if (role === 'bot') {
+        contentHtml = `
+            <div class="avatar">🤖</div>
+            <div class="bubble">${formatText(text)}</div>
+        `;
+    } else {
+        contentHtml = `
+            <div class="bubble">${formatText(text)}</div>
+        `;
+    }
+    
+    msgDiv.innerHTML = contentHtml;
+    chatBox.appendChild(msgDiv);
+    scrollToBottom();
+  }
+
+  function scrollToBottom() {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  function showLoading(show) {
+    if (show) {
+      loading.classList.remove('hidden');
+      chatBox.appendChild(loading); // 移動到最下方
+      scrollToBottom();
+    } else {
+      loading.classList.add('hidden');
+    }
+  }
 
   async function send() {
-    const text = input.value.trim(); //trim()移除字串起始及結尾處的空白字元
+    const text = input.value.trim();
     if (!text) return;
+
+    // 1. 顯示使用者訊息
     input.value = '';
-    log.textContent += `\n\n> ${text}`;
+    appendMessage('user', text);
+
+    // 2. 顯示載入中
+    showLoading(true);
+    input.disabled = true; // 防止重複送出
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -27,12 +112,27 @@
         body: JSON.stringify({ sessionId: sid, text })
       });
       const data = await res.json();
-      log.textContent += `\n\n>> ${data.reply}`;
-      log.scrollTop = log.scrollHeight;
+      
+      // 3. 隱藏載入中並顯示回應
+      showLoading(false);
+      appendMessage('bot', data.reply);
+
     } catch (e) {
-      log.textContent += `\n\n[錯誤] 無法連線後端：${e}`;
+      showLoading(false);
+      appendMessage('bot', `[系統錯誤] 無法連線伺服器：${e}`);
+    } finally {
+      input.disabled = false;
+      input.focus();
     }
   }
+
   sendBtn.onclick = send;
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+  input.addEventListener('keydown', (e) => { 
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send(); 
+    }
+  });
 </script>
+</body>
+</html>
