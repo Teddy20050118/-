@@ -1,0 +1,9 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+
+# MySQL
+mysql-connector-python>=9.0
+
+# Optional: log analysis script
+matplotlib>=3.8

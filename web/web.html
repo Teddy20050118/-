@@ -4,11 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>點餐助理</title>
+<<<<<<< HEAD
   <link rel="stylesheet" href="/web/web.css">
+=======
+  <link rel="stylesheet" href="/web/web.css?v=20251230-1">
+>>>>>>> 0010799 (init)
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
+<<<<<<< HEAD
   <div class="app-container">
     <header>
       <h1> 點餐助理</h1>
@@ -131,6 +136,888 @@
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         send(); 
+=======
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="lc-sidebar-top">
+        <button id="new-chat-btn" class="lc-newchat" type="button">
+          <span class="lc-newchat-label">新對話</span>
+        </button>
+        <button id="import-btn" class="lc-icon-btn" type="button" title="匯入菜單" aria-label="匯入菜單">⤓</button>
+      </div>
+
+      <div class="chat-search">
+        <input id="chat-search" type="text" placeholder="搜尋訊息" autocomplete="off" />
+      </div>
+
+      <nav class="lc-nav" aria-label="sidebar shortcuts">
+        <button class="lc-nav-item" type="button">書籤</button>
+        <button class="lc-nav-item" type="button">AI 小幫手提示</button>
+      </nav>
+
+      <div class="lc-divider"></div>
+
+      <div class="sidebar-chats" aria-label="對話列表">
+        <div class="chat-tools">
+          <button id="export-all-btn" class="ghost-btn" type="button">匯出</button>
+          <button id="import-json-btn" class="ghost-btn" type="button">匯入</button>
+          <input id="import-file" type="file" accept="application/json" hidden />
+        </div>
+        <div id="chat-list" class="chat-list"></div>
+      </div>
+    </aside>
+
+    <main class="chat-panel">
+      <header class="chat-header">
+        <div>
+          <p class="chat-title">點餐助理</p>
+          <p class="chat-subtitle">告訴我預算、人數、口味或忌口，我會幫你整理推薦。</p>
+        </div>
+        <div class="header-actions">
+          <button id="clear-btn" class="ghost-btn" type="button">清除</button>
+          <button id="help-btn" class="ghost-btn" type="button">幫助</button>
+        </div>
+      </header>
+
+      <section class="chat-body">
+        <div class="chat-bar" aria-hidden="true"></div>
+
+        <div id="home" class="lc-home" aria-label="home">
+          <h1 class="lc-home-title">早安，點餐助理</h1>
+          <div class="lc-home-input">
+            <div class="input-wrapper lc-home-inputwrap">
+              <input id="home-input" type="text" placeholder="傳送訊息給點餐助理" autocomplete="off" />
+              <button id="home-send" type="button" aria-label="送出">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="chat-box" class="conversation">
+          <div class="message bot">
+            <div class="avatar">🤖</div>
+            <div class="bubble">
+              你好！我是你的點餐助理。<br>
+              請告訴我你的需求，例如：「<b>預算 300 元，想吃不辣的</b>」或「<b>5個人聚餐，要有飲料</b>」。
+            </div>
+          </div>
+        </div>
+
+        <div id="loading-indicator" class="message bot hidden" aria-live="polite">
+          <div class="avatar">🤖</div>
+          <div class="bubble loading">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      </section>
+
+      <footer class="chat-footer">
+        <div id="input-area" class="input-area">
+          <div class="input-wrapper">
+            <input id="input" type="text" placeholder="輸入你的需求…" autocomplete="off" />
+            <button id="send-btn" type="button" aria-label="送出">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+          </div>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <div id="chat-menu" class="chat-menu hidden" role="menu" aria-label="對話選單">
+    <button type="button" class="chat-menu-item" data-action="rename">改名</button>
+    <button type="button" class="chat-menu-item" data-action="pin">釘選/取消釘選</button>
+    <button type="button" class="chat-menu-item" data-action="export">匯出此對話</button>
+    <div class="chat-menu-sep"></div>
+    <button type="button" class="chat-menu-item danger" data-action="delete">刪除</button>
+  </div>
+
+  <div id="toast-host" class="toast-host" aria-live="polite" aria-relevant="additions"></div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    try {
+    const sidFactory = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+
+    const chatBox = document.getElementById('chat-box');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send-btn');
+    const loading = document.getElementById('loading-indicator');
+    const newChatBtn = document.getElementById('new-chat-btn');
+    const importBtn = document.getElementById('import-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const helpBtn = document.getElementById('help-btn');
+    const chatListEl = document.getElementById('chat-list');
+  const homeEl = document.getElementById('home');
+  const homeInput = document.getElementById('home-input');
+  const homeSend = document.getElementById('home-send');
+  const chatSearchEl = document.getElementById('chat-search');
+  const exportAllBtn = document.getElementById('export-all-btn');
+  const importJsonBtn = document.getElementById('import-json-btn');
+  const importFileEl = document.getElementById('import-file');
+  const chatMenuEl = document.getElementById('chat-menu');
+  const toastHostEl = document.getElementById('toast-host');
+
+    // ---- 多對話狀態（前端保存）----
+    const STORAGE_KEY = 'ordering_assistant_threads_v1';
+    const ACTIVE_KEY = 'ordering_assistant_active_thread_v1';
+
+  // UI state
+  let searchQuery = '';
+  let menuThreadId = null;
+  let lastUndo = null; // {type, payload, expiresAt}
+  let editingThreadId = null;
+
+    function getWelcomeHTML() {
+      return `
+        <div class="message bot">
+          <div class="avatar">🤖</div>
+          <div class="bubble">
+            你好！我是你的點餐助理。<br>
+            請告訴我你的需求，例如：「<b>預算 300 元，想吃不辣的</b>」或「<b>5個人聚餐，要有飲料</b>」。
+          </div>
+        </div>`;
+    }
+
+    /**
+     * Thread shape:
+  * { id, title, createdAt, lastUpdatedAt, pinned, flags, sessionId, messages: [{role, text}] }
+     */
+    let threads = [];
+    let activeThreadId = null;
+
+    function nowTs() { return Date.now(); }
+
+    function relativeTime(ts) {
+      if (!ts) return '';
+      const diff = Math.max(0, nowTs() - ts);
+      const m = Math.floor(diff / 60000);
+      if (m < 1) return '剛剛';
+      if (m < 60) return `${m} 分鐘前`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h} 小時前`;
+      const d = Math.floor(h / 24);
+      return `${d} 天前`;
+    }
+
+    function computePreview(thread) {
+      const msgs = Array.isArray(thread.messages) ? thread.messages : [];
+      const last = msgs[msgs.length - 1];
+      if (!last || !last.text) return '';
+      const t = String(last.text).replace(/\s+/g, ' ').trim();
+      return t.length > 26 ? (t.slice(0, 26) + '…') : t;
+    }
+
+    function normalizeThread(t) {
+      if (!t || typeof t !== 'object') return null;
+      t.id = t.id || sidFactory();
+      t.title = t.title || '新對話';
+      t.createdAt = typeof t.createdAt === 'number' ? t.createdAt : nowTs();
+      t.lastUpdatedAt = typeof t.lastUpdatedAt === 'number' ? t.lastUpdatedAt : t.createdAt;
+      t.pinned = Boolean(t.pinned);
+      t.flags = t.flags && typeof t.flags === 'object' ? t.flags : {};
+      t.sessionId = t.sessionId || sidFactory();
+      t.messages = Array.isArray(t.messages) ? t.messages : [];
+      return t;
+    }
+
+    function safeParseJSON(s) {
+      try { return JSON.parse(s); } catch { return null; }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(threads));
+        if (activeThreadId) localStorage.setItem(ACTIVE_KEY, activeThreadId);
+      } catch (e) {
+        console.warn('saveState failed', e);
+      }
+    }
+
+    function loadState() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const loaded = raw ? safeParseJSON(raw) : null;
+      threads = Array.isArray(loaded) ? loaded.map(normalizeThread).filter(Boolean) : [];
+      const aid = localStorage.getItem(ACTIVE_KEY);
+      activeThreadId = aid || (threads[0] && threads[0].id) || null;
+    }
+
+    function getActiveThread() {
+      return threads.find(t => t.id === activeThreadId) || null;
+    }
+
+    function computeTitleFromFirstUserMessage(thread) {
+      const firstUser = (thread.messages || []).find(m => m && m.role === 'user' && m.text);
+      if (!firstUser) return '新對話';
+      const t = String(firstUser.text).trim().replace(/\s+/g, ' ');
+      return t.length > 14 ? (t.slice(0, 14) + '…') : t;
+    }
+
+    function renderChatList() {
+      if (!chatListEl) return;
+      const q = String(searchQuery || '').trim().toLowerCase();
+      let list = threads.slice();
+      if (q) {
+        list = list.filter(t => {
+          const title = String(t.title || '').toLowerCase();
+          const preview = computePreview(t).toLowerCase();
+          return title.includes(q) || preview.includes(q);
+        });
+      }
+
+      if (!list.length) {
+        chatListEl.innerHTML = `<div class="chat-list-empty">尚無對話</div>`;
+        return;
+      }
+
+      const activeEditId = editingThreadId;
+      chatListEl.innerHTML = list
+        .sort((a, b) => {
+          const ap = a.pinned ? 1 : 0;
+          const bp = b.pinned ? 1 : 0;
+          if (ap !== bp) return bp - ap;
+          return (b.lastUpdatedAt || b.createdAt || 0) - (a.lastUpdatedAt || a.createdAt || 0);
+        })
+        .map(t => {
+          const title = t.title || '新對話';
+          const preview = computePreview(t);
+          const timeText = relativeTime(t.lastUpdatedAt || t.createdAt);
+          const active = t.id === activeThreadId;
+
+          const isEditing = t.id === activeEditId;
+
+          const pinIcon = t.pinned ? '📌' : '';
+          const clearedIcon = t.flags && t.flags.cleared ? '🧹' : '';
+          const errorIcon = t.flags && t.flags.error ? '⚠️' : '';
+          const icons = [pinIcon, clearedIcon, errorIcon].filter(Boolean).join(' ');
+
+          const renameUI = isEditing
+            ? `
+              <div class="chat-rename" data-rename-wrap="${t.id}">
+                <input class="chat-rename-input" data-rename-input="${t.id}" type="text" value="${escapeHtml(title)}" maxlength="40" />
+                <button class="chat-rename-btn" type="button" data-rename-save="${t.id}">儲存</button>
+                <button class="chat-rename-btn ghost" type="button" data-rename-cancel="${t.id}">取消</button>
+              </div>
+            `
+            : '';
+          return `
+            <div class="chat-list-row ${active ? 'active' : ''}" data-thread-id="${t.id}">
+              <button class="chat-list-item" type="button" data-thread-id="${t.id}" title="切換對話">
+                ${isEditing ? renameUI : `
+                  <div class="chat-list-top">
+                    <span class="chat-list-title">${escapeHtml(title)}</span>
+                    <span class="chat-list-time">${escapeHtml(timeText)}</span>
+                  </div>
+                  <div class="chat-list-preview">
+                    ${icons ? `<span class="chat-list-icons">${escapeHtml(icons)}</span>` : ''}
+                    <span class="chat-list-preview-text">${escapeHtml(preview || ' ')}</span>
+                  </div>
+                `}
+              </button>
+              <button class="chat-list-more" type="button" aria-label="更多" title="更多" data-thread-more="${t.id}">⋯</button>
+            </div>`;
+        })
+        .join('');
+
+      chatListEl.querySelectorAll('[data-thread-id]').forEach(btn => {
+        // 只在「切換按鈕」上綁定，避免點到 more 也切換
+        if (!(btn instanceof HTMLButtonElement)) return;
+        if (btn.hasAttribute('data-thread-more')) return;
+        btn.addEventListener('click', () => {
+          const tid = btn.getAttribute('data-thread-id');
+          if (!tid) return;
+          // editing mode: do not switch thread when clicking inside rename area
+          if (editingThreadId && editingThreadId === tid) return;
+          switchThread(tid);
+        });
+      });
+
+      chatListEl.querySelectorAll('[data-thread-more]').forEach(moreBtn => {
+        moreBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const tid = moreBtn.getAttribute('data-thread-more');
+          if (!tid) return;
+          if (editingThreadId) return; // avoid menu while editing
+          openThreadMenu({ threadId: tid, anchorEl: moreBtn });
+        });
+      });
+
+      // Right-click menu
+      chatListEl.querySelectorAll('.chat-list-row').forEach(row => {
+        row.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          const tid = row.getAttribute('data-thread-id');
+          if (!tid) return;
+          if (editingThreadId) return;
+          openThreadMenu({ threadId: tid, point: { x: e.clientX, y: e.clientY } });
+        });
+      });
+
+      // rename handlers (inline)
+      chatListEl.querySelectorAll('[data-rename-input]').forEach(el => {
+        const inputEl = el;
+        inputEl.addEventListener('keydown', (e) => {
+          const tid = inputEl.getAttribute('data-rename-input');
+          if (!tid) return;
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commitInlineRename(tid, inputEl.value);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelInlineRename(tid);
+          }
+        });
+        inputEl.addEventListener('click', (e) => e.stopPropagation());
+      });
+      chatListEl.querySelectorAll('[data-rename-save]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const tid = btn.getAttribute('data-rename-save');
+          if (!tid) return;
+          const inputEl = chatListEl.querySelector(`[data-rename-input="${tid}"]`);
+          commitInlineRename(tid, inputEl ? inputEl.value : '');
+        });
+      });
+      chatListEl.querySelectorAll('[data-rename-cancel]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const tid = btn.getAttribute('data-rename-cancel');
+          if (!tid) return;
+          cancelInlineRename(tid);
+        });
+      });
+
+      // focus the rename input after render
+      if (activeEditId) {
+        const inputEl = chatListEl.querySelector(`[data-rename-input="${activeEditId}"]`);
+        if (inputEl) {
+          try {
+            inputEl.focus();
+            inputEl.select();
+          } catch {}
+        }
+      }
+    }
+
+    function closeThreadMenu() {
+      if (!chatMenuEl) return;
+      chatMenuEl.classList.add('hidden');
+      menuThreadId = null;
+    }
+
+    function openThreadMenu({ threadId, anchorEl, point } = {}) {
+      if (!chatMenuEl) return;
+      menuThreadId = threadId;
+      chatMenuEl.classList.remove('hidden');
+
+      const rect = anchorEl ? anchorEl.getBoundingClientRect() : null;
+      const x = point ? point.x : (rect ? (rect.left + 6) : 0);
+      const y = point ? point.y : (rect ? (rect.bottom + 6) : 0);
+
+      // Position fixed in viewport
+      const pad = 8;
+      const menuRect = chatMenuEl.getBoundingClientRect();
+      let left = x;
+      let top = y;
+      if (left + menuRect.width + pad > window.innerWidth) left = window.innerWidth - menuRect.width - pad;
+      if (top + menuRect.height + pad > window.innerHeight) top = window.innerHeight - menuRect.height - pad;
+      chatMenuEl.style.left = `${Math.max(pad, left)}px`;
+      chatMenuEl.style.top = `${Math.max(pad, top)}px`;
+    }
+
+    function showToast({ message, actionText, onAction, timeoutMs = 5000 } = {}) {
+      if (!toastHostEl) return;
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `
+        <div class="toast-msg">${escapeHtml(message || '')}</div>
+        ${actionText ? `<button type="button" class="toast-action">${escapeHtml(actionText)}</button>` : ''}
+        <button type="button" class="toast-close" aria-label="關閉">×</button>
+      `;
+      toastHostEl.appendChild(toast);
+
+      const close = () => {
+        if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+      };
+
+      const btn = toast.querySelector('.toast-action');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          try { onAction && onAction(); } finally { close(); }
+        });
+      }
+      const x = toast.querySelector('.toast-close');
+      if (x) x.addEventListener('click', close);
+
+      window.setTimeout(close, timeoutMs);
+    }
+
+    function deleteThread(threadId) {
+      const idx = threads.findIndex(x => x.id === threadId);
+      if (idx < 0) return;
+      const removed = threads[idx];
+      threads.splice(idx, 1);
+      // prepare undo
+      lastUndo = { type: 'delete', payload: removed, expiresAt: nowTs() + 10000 };
+
+      if (activeThreadId === threadId) {
+        activeThreadId = (threads[0] && threads[0].id) || null;
+        if (!activeThreadId) createThread({ autoSwitch: true });
+        redrawConversation({ keepScrollIfReading: false });
+      }
+      saveState();
+      renderChatList();
+
+      showToast({
+        message: `已刪除對話「${removed.title || '新對話'}」`,
+        actionText: '復原',
+        onAction: () => {
+          if (!lastUndo || lastUndo.type !== 'delete') return;
+          if (nowTs() > lastUndo.expiresAt) return;
+          threads.push(normalizeThread(lastUndo.payload));
+          saveState();
+          renderChatList();
+        },
+        timeoutMs: 9000,
+      });
+    }
+
+    function renameThread(threadId) {
+      const t = threads.find(x => x.id === threadId);
+      if (!t) return;
+      // true inline rename (LibreChat-like)
+      closeThreadMenu();
+      editingThreadId = threadId;
+      renderChatList();
+    }
+
+    function cancelInlineRename(threadId) {
+      if (editingThreadId !== threadId) return;
+      editingThreadId = null;
+      renderChatList();
+    }
+
+    function commitInlineRename(threadId, value) {
+      const t = threads.find(x => x.id === threadId);
+      if (!t) return cancelInlineRename(threadId);
+
+      const before = t.title || '新對話';
+      const after = String(value || '').trim() || '新對話';
+      editingThreadId = null;
+
+      if (after === before) {
+        renderChatList();
+        return;
+      }
+
+      t.title = after;
+      t.lastUpdatedAt = nowTs();
+      saveState();
+      renderChatList();
+
+      showToast({
+        message: `已重新命名為「${after}」`,
+        actionText: '復原',
+        onAction: () => {
+          t.title = before;
+          t.lastUpdatedAt = nowTs();
+          saveState();
+          renderChatList();
+        },
+      });
+    }
+
+    function togglePin(threadId) {
+      const t = threads.find(x => x.id === threadId);
+      if (!t) return;
+      t.pinned = !t.pinned;
+      t.lastUpdatedAt = nowTs();
+      saveState();
+      renderChatList();
+      showToast({ message: t.pinned ? '已釘選對話' : '已取消釘選' });
+    }
+
+    function exportJSON(obj, filename) {
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function exportAllThreads() {
+      exportJSON({ version: 1, exportedAt: nowTs(), threads }, `點餐助理-對話備份-${nowTs()}.json`);
+      showToast({ message: '已匯出對話備份' });
+    }
+
+    function exportOneThread(threadId) {
+      const t = threads.find(x => x.id === threadId);
+      if (!t) return;
+      exportJSON({ version: 1, exportedAt: nowTs(), thread: t }, `點餐助理-對話-${t.title || '新對話'}.json`);
+      showToast({ message: '已匯出此對話' });
+    }
+
+    function importThreadsFromJSON(data) {
+      // 支援兩種格式：{threads:[...]} 或 {thread:{...}}
+      if (!data) throw new Error('JSON 為空');
+      const importedThreads = [];
+      if (Array.isArray(data.threads)) importedThreads.push(...data.threads);
+      if (data.thread) importedThreads.push(data.thread);
+      if (!importedThreads.length) throw new Error('找不到 threads/thread 欄位');
+
+      const normalized = importedThreads.map(normalizeThread).filter(Boolean);
+      // merge by id (avoid duplicates)
+      const existingIds = new Set(threads.map(t => t.id));
+      for (const t of normalized) {
+        if (existingIds.has(t.id)) {
+          // if collision, generate new id
+          t.id = sidFactory();
+        }
+        threads.push(t);
+      }
+      if (!activeThreadId && threads[0]) activeThreadId = threads[0].id;
+      saveState();
+      renderChatList();
+      showToast({ message: `已匯入 ${normalized.length} 個對話` });
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function switchThread(threadId) {
+      const t = threads.find(x => x.id === threadId);
+      if (!t) return;
+      activeThreadId = threadId;
+      // 切換時渲染訊息
+      redrawConversation();
+      renderChatList();
+      saveState();
+      input && input.focus();
+    }
+
+    function createThread({ autoSwitch = true } = {}) {
+      const t = {
+        id: sidFactory(),
+        title: '新對話',
+        createdAt: Date.now(),
+        lastUpdatedAt: Date.now(),
+        pinned: false,
+        flags: {},
+        sessionId: sidFactory(),
+        messages: []
+      };
+      threads.push(t);
+      if (autoSwitch) activeThreadId = t.id;
+      saveState();
+      renderChatList();
+      return t;
+    }
+
+    function redrawConversation({ keepScrollIfReading = true } = {}) {
+      if (!chatBox) return;
+      const shouldAutoScroll = keepScrollIfReading ? isNearBottom() : true;
+
+      const t = getActiveThread();
+
+      // Home screen: show when no messages
+      const hasMessages = Boolean(t && Array.isArray(t.messages) && t.messages.length);
+      if (homeEl) homeEl.classList.toggle('hidden', hasMessages);
+      if (chatBox) chatBox.classList.toggle('hidden', !hasMessages);
+      if (!hasMessages) {
+        if (homeInput) homeInput.value = '';
+        return;
+      }
+
+      chatBox.innerHTML = getWelcomeHTML();
+      if (!t) {
+        if (shouldAutoScroll) scrollToBottom();
+        return;
+      }
+
+      // 依序把 thread.messages 渲染回來
+      for (const m of (t.messages || [])) {
+        if (!m || !m.role) continue;
+        appendMessage(m.role, m.text, { persist: false });
+      }
+
+      if (shouldAutoScroll) scrollToBottom();
+    }
+
+    function ensureBasics() {
+      if (!chatBox || !input || !sendBtn) {
+        alert('前端初始化失敗：找不到主要元素');
+        return false;
+      }
+      return true;
+    }
+
+    // 簡單的文字轉 HTML 處理 (處理換行與粗體)
+    function formatText(text) {
+      if (!text) return "";
+      let html = text.replace(/\n/g, '<br>');
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      return html;
+    }
+
+    function appendMessage(role, text, { persist = true } = {}) {
+      const shouldAutoScroll = isNearBottom();
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `message ${role}`;
+      msgDiv.innerHTML = role === 'bot'
+        ? `<div class="avatar">🤖</div><div class="bubble">${formatText(text)}</div>`
+        : `<div class="bubble">${formatText(text)}</div>`;
+      chatBox.appendChild(msgDiv);
+      if (shouldAutoScroll) scrollToBottom();
+
+      if (persist) {
+        const t = getActiveThread() || createThread({ autoSwitch: true });
+        t.messages = Array.isArray(t.messages) ? t.messages : [];
+        t.messages.push({ role, text });
+        t.lastUpdatedAt = nowTs();
+        // 第一次 user 訊息後，更新標題
+        if (role === 'user' && (!t.title || t.title === '新對話')) {
+          t.title = computeTitleFromFirstUserMessage(t);
+        }
+        saveState();
+        renderChatList();
+      }
+    }
+
+    function isNearBottom() {
+      // 距離底部 <= thresholdPx 視為使用者正在看最新訊息
+      const thresholdPx = 24;
+      const distance = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight;
+      return distance <= thresholdPx;
+    }
+
+    function scrollToBottom() {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function showLoading(show) {
+      if (show) {
+        loading.classList.remove('hidden');
+        chatBox.appendChild(loading); // 移動到最下方
+        // 只有在使用者本來就在底部才自動捲動，避免打斷閱讀。
+        if (isNearBottom()) scrollToBottom();
+      } else {
+        loading.classList.add('hidden');
+      }
+    }
+
+    async function send() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      // 沒有 thread 時自動建立
+      if (!getActiveThread()) {
+        createThread({ autoSwitch: true });
+        redrawConversation({ keepScrollIfReading: false });
+      }
+
+      input.value = '';
+      appendMessage('user', text);
+
+      showLoading(true);
+      input.disabled = true;
+
+      const t = getActiveThread();
+      const sessionId = (t && t.sessionId) ? t.sessionId : sidFactory();
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ sessionId, text })
+        });
+        const data = await res.json();
+        showLoading(false);
+        appendMessage('bot', data.reply || '[系統錯誤] 伺服器未回傳內容');
+      } catch (e) {
+        showLoading(false);
+        const t = getActiveThread();
+        if (t) {
+          t.flags = t.flags && typeof t.flags === 'object' ? t.flags : {};
+          t.flags.error = true;
+          t.lastUpdatedAt = nowTs();
+          saveState();
+          renderChatList();
+        }
+        appendMessage('bot', `[系統錯誤] 無法連線伺服器：${e}`);
+      } finally {
+        input.disabled = false;
+        input.focus();
+      }
+    }
+
+    async function sendFromHome() {
+      if (!homeInput) return;
+      const text = homeInput.value.trim();
+      if (!text) return;
+
+      // Ensure there is an active thread
+      if (!getActiveThread()) {
+        createThread({ autoSwitch: true });
+      }
+
+      // Switch to chat view
+      if (homeEl) homeEl.classList.add('hidden');
+      if (chatBox) chatBox.classList.remove('hidden');
+
+      input.value = text;
+      homeInput.value = '';
+      return send();
+    }
+
+    // 清除：只清空目前 thread 的訊息
+    function clearActiveChat({ notice = '' } = {}) {
+      showLoading(false);
+      const t = getActiveThread();
+      if (t) {
+        t.messages = [];
+        t.title = '新對話';
+        // 清除也代表重新開始一個 session
+        t.sessionId = sidFactory();
+        t.lastUpdatedAt = nowTs();
+        t.flags = t.flags && typeof t.flags === 'object' ? t.flags : {};
+        t.flags.cleared = true;
+        saveState();
+        renderChatList();
+      }
+
+      chatBox.innerHTML = getWelcomeHTML();
+      if (notice) appendMessage('bot', notice);
+      input.value = '';
+      input.disabled = false;
+      input.focus();
+    }
+
+    // 新對話：建立新的 thread，舊的保留在列表
+    function newChat({ notice = '已開啟新對話。' } = {}) {
+      showLoading(false);
+      createThread({ autoSwitch: true });
+      chatBox.innerHTML = getWelcomeHTML();
+      if (notice) appendMessage('bot', notice);
+      input.value = '';
+      input.disabled = false;
+      input.focus();
+    }
+
+    function handleHelp() {
+      appendMessage('bot', '提示：輸入預算、人數、口味或忌口，例如「預算 300 不辣 要飲料」。');
+    }
+
+    if (ensureBasics()) {
+      sendBtn.onclick = send;
+      input.addEventListener('keydown', (e) => { 
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            send(); 
+        }
+      });
+
+      // 初始化：讀取保存的對話；若沒有則建立一個預設對話
+      loadState();
+      if (!threads.length) {
+        createThread({ autoSwitch: true });
+      }
+      if (!getActiveThread() && threads[0]) {
+        activeThreadId = threads[0].id;
+      }
+      renderChatList();
+      redrawConversation({ keepScrollIfReading: false });
+
+      if (homeSend) homeSend.addEventListener('click', sendFromHome);
+      if (homeInput) {
+        homeInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendFromHome();
+          }
+        });
+      }
+
+      if (chatSearchEl) {
+        chatSearchEl.addEventListener('input', () => {
+          searchQuery = chatSearchEl.value || '';
+          renderChatList();
+        });
+      }
+
+      if (exportAllBtn) exportAllBtn.addEventListener('click', exportAllThreads);
+      if (importJsonBtn && importFileEl) {
+        importJsonBtn.addEventListener('click', () => importFileEl.click());
+        importFileEl.addEventListener('change', async () => {
+          const f = importFileEl.files && importFileEl.files[0];
+          if (!f) return;
+          try {
+            const text = await f.text();
+            const data = safeParseJSON(text);
+            importThreadsFromJSON(data);
+          } catch (e) {
+            showToast({ message: `匯入失敗：${e}` });
+          } finally {
+            importFileEl.value = '';
+          }
+        });
+      }
+
+      // menu actions
+      if (chatMenuEl) {
+        chatMenuEl.querySelectorAll('[data-action]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const action = btn.getAttribute('data-action');
+            const tid = menuThreadId;
+            closeThreadMenu();
+            if (!tid) return;
+            if (action === 'rename') return renameThread(tid);
+            if (action === 'pin') return togglePin(tid);
+            if (action === 'export') return exportOneThread(tid);
+            if (action === 'delete') return deleteThread(tid);
+          });
+        });
+      }
+
+      // global close handlers
+      window.addEventListener('click', (e) => {
+        if (!chatMenuEl || chatMenuEl.classList.contains('hidden')) return;
+        if (e.target === chatMenuEl || chatMenuEl.contains(e.target)) return;
+        closeThreadMenu();
+      });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeThreadMenu();
+      });
+
+      // Close the floating menu on scroll/resize (LibreChat-like behavior)
+      // Capture scroll on window + chat list scroll.
+      window.addEventListener('resize', () => closeThreadMenu());
+      window.addEventListener('scroll', () => closeThreadMenu(), true);
+      if (chatListEl) chatListEl.addEventListener('scroll', () => closeThreadMenu(), { passive: true });
+
+      if (newChatBtn) newChatBtn.addEventListener('click', () => newChat({ notice: '已開啟新對話（舊對話已保存）。' }));
+      if (clearBtn) clearBtn.addEventListener('click', () => clearActiveChat({ notice: '已清除當前對話內容（仍保留此對話槽）。' }));
+      if (helpBtn) helpBtn.addEventListener('click', handleHelp);
+      if (importBtn) importBtn.addEventListener('click', () => alert('匯入菜單：請使用後端工具或管理介面')); // placeholder
+      console.info('[點餐助理] 前端已就緒');
+    }
+    } catch (err) {
+      console.error('前端初始化失敗', err);
+      alert(`前端初始化失敗：${err}`);
+>>>>>>> 0010799 (init)
     }
   });
 </script>

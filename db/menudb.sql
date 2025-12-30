@@ -1,0 +1,33 @@
+-- 建立資料庫 
+CREATE DATABASE IF NOT EXISTS MyOrderingDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE MyOrderingDB;
+
+-- 類別表
+CREATE TABLE IF NOT EXISTS Categories (
+    CategoryID INT AUTO_INCREMENT PRIMARY KEY,
+    CategoryName VARCHAR(50) NOT NULL UNIQUE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 產品表
+CREATE TABLE IF NOT EXISTS Products (
+    ProductID INT AUTO_INCREMENT PRIMARY KEY,
+    ProductName VARCHAR(100) NOT NULL,
+    Price DECIMAL(10, 2) DEFAULT 0, -- 0 代表時價
+    CategoryID INT NOT NULL,
+    CONSTRAINT FK_Category FOREIGN KEY (CategoryID) REFERENCES Categories(CategoryID)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 標籤表
+CREATE TABLE IF NOT EXISTS Tags (
+    TagID INT AUTO_INCREMENT PRIMARY KEY,
+    TagName VARCHAR(20) NOT NULL UNIQUE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 產品與標籤的關聯表
+CREATE TABLE IF NOT EXISTS ProductTags (
+    ProductID INT NOT NULL,
+    TagID INT NOT NULL,
+    PRIMARY KEY (ProductID, TagID),
+    CONSTRAINT FK_Product FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
+    CONSTRAINT FK_Tag FOREIGN KEY (TagID) REFERENCES Tags(TagID)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
