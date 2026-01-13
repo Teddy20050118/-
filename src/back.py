@@ -1,10 +1,11 @@
 import os, sys, json
-from typing import Dict, List
-from fastapi import FastAPI
+from typing import Dict, List, Optional
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import asyncio
 
 # 確保可以從 src/ 匯入模組
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -99,6 +100,17 @@ class ChatReq(BaseModel):
 class ChatResp(BaseModel):
     reply: str
 
+class CrawlReq(BaseModel):
+    query: str
+    maxShops: Optional[int] = 5
+    maxItems: Optional[int] = 30
+
+class CrawlResp(BaseModel):
+    success: bool
+    message: str
+    itemCount: Optional[int] = None
+    restaurants: Optional[List[dict]] = None
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -106,6 +118,58 @@ def health():
 @app.get("/")
 def index():
     return FileResponse(os.path.join(WEB_DIR, "web.html"))
+
+@app.post("/api/crawl", response_model=CrawlResp)
+async def api_crawl(req: CrawlReq):
+    """即時爬取 Google Maps 餐廳菜單。
+    
+    前端可以呼叫此 API，傳入搜尋關鍵字（例如 "台中 火鍋"），
+    後端會使用 crawler.py 的邏輯去抓餐廳菜單，並回傳結果。
+    
+    注意：
+    - 這是個耗時操作（5-30秒），建議前端顯示 loading 狀態
+    - 結果不會自動寫入資料庫，僅回傳給前端參考
+    - 若要整合到推薦系統，需手動合併到 menu.json 或 DB
+    """
+    try:
+        # 動態導入 crawler 模組（避免啟動時就要求 playwright）
+        try:
+            sys.path.insert(0, PROJECT_ROOT)
+            from crawler import crawl_google_maps, to_menu_json
+        except ImportError as e:
+            raise HTTPException(
+                status_code=503,
+                detail=f"爬蟲功能未啟用，缺少 playwright：{e}"
+            )
+        
+        # 執行爬蟲（async）
+        restaurants = await crawl_google_maps(
+            req.query,
+            max_shops=req.maxShops,
+            max_items_per_shop=req.maxItems,
+            headless=True,
+        )
+        
+        # 轉成 JSON 格式
+        menu_data = to_menu_json(restaurants)
+        
+        return CrawlResp(
+            success=True,
+            message=f"成功爬取 {len(restaurants)} 間餐廳，共 {len(menu_data)} 道菜",
+            itemCount=len(menu_data),
+            restaurants=[{
+                "name": r.name,
+                "rating": r.rating,
+                "address": r.address,
+                "menuItemCount": len(r.menu_items) if r.menu_items else 0,
+            } for r in restaurants],
+        )
+        
+    except Exception as e:
+        return CrawlResp(
+            success=False,
+            message=f"爬取失敗：{str(e)}"
+        )
 
 @app.post("/api/chat", response_model=ChatResp)
 def api_chat(req: ChatReq):
