@@ -153,9 +153,18 @@ async def api_crawl(req: CrawlReq):
         # 轉成 JSON 格式
         menu_data = to_menu_json(restaurants)
         
+        # 統計有菜單的餐廳數量
+        restaurants_with_menu = sum(1 for r in restaurants if r.menu_items and len(r.menu_items) > 0)
+        
+        message = f"成功爬取 {len(restaurants)} 間餐廳"
+        if restaurants_with_menu > 0:
+            message += f"，其中 {restaurants_with_menu} 間有菜單資料（共 {len(menu_data)} 道菜）"
+        else:
+            message += "，但這些餐廳在 Google Maps 上沒有提供結構化的菜單資料"
+        
         return CrawlResp(
             success=True,
-            message=f"成功爬取 {len(restaurants)} 間餐廳，共 {len(menu_data)} 道菜",
+            message=message,
             itemCount=len(menu_data),
             restaurants=[{
                 "name": r.name,
