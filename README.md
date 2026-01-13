@@ -1,6 +1,54 @@
-# 點餐助理（手機可用）
+# 點餐助理（手機可用 · LibreChat 風格 · 多餐廳爬蟲）
 
-這個專案是 FastAPI + 純前端（`web/`）的點餐聊天推薦介面。
+這個專案是 FastAPI + 純前端（`web/`）的點餐聊天推薦介面，具備：
+
+- 🤖 智能菜單推薦（預算、人數、不辣、飲料等偏好感知）
+- 💬 LibreChat 風格 UI，支援多對話管理、搜尋、匯出/匯入
+- 🕷️ Google Maps 菜單爬蟲（`crawler.py`），可批量抓取多間餐廳菜單
+- 🌐 Render 雲端部署，手機隨時隨地可用
+- 🔄 資料庫連線失敗時自動 fallback 到本地 `menu.json`
+
+---
+
+## 快速開始（雲端已部署）
+
+**直接手機打開：https://ordering-assistant.onrender.com/**
+
+輸入「預算 3000 元」「要有飲料」「5 個人」等需求，AI 會推薦菜色組合。
+
+---
+
+## 本地開發與使用
+
+### 安裝依賴
+
+```powershell
+pip install -r requirements.txt
+playwright install chromium  # 若要使用爬蟲功能
+```
+
+### 啟動後端
+
+```powershell
+python -m uvicorn src.back:app --host 127.0.0.1 --port 8000 --reload
+```
+
+打開 http://127.0.0.1:8000/ 使用前端界面。
+
+---
+
+## 菜單爬蟲使用（新功能）
+
+用 `crawler.py` 從 Google Maps 批量抓取餐廳菜單：
+
+```powershell
+# 抓取台中沙鹿餐廳菜單
+python crawler.py "沙鹿 餐廳 菜單" --max-shops 10 --out menu_scraped.json
+```
+
+詳細用法請見 [CRAWLER_README.md](./CRAWLER_README.md)。
+
+---
 
 ## 方案 B：手機用「公開網址」打開（不在同一個 Wi‑Fi 也能用）
 

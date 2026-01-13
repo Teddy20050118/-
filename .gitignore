@@ -1,0 +1,11 @@
+# Python cache / artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+logs/*.jsonl
+logs/*.log
+
+# Playwright downloads
+playwright/.local-browsers/

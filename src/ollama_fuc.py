@@ -105,6 +105,127 @@ def _extract_json(text: str) -> Any:
             return None
     return None
 
+def _flatten_menu(menu: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """將 menu.json 結構攤平成列表，方便 fallback 使用，不依賴資料庫。
+
+    回傳欄位：name, price, category, tags
+    """
+    items: List[Dict[str, Any]] = []
+    cats = menu.get("categories") or []
+    for cat in cats:
+        cname = str(cat.get("name") or "")
+        for item in cat.get("items", []):
+            items.append({
+                "name": item.get("name"),
+                "price": item.get("price"),
+                "category": cname,
+                "tags": item.get("tags") or [],
+            })
+    return items
+
+
+def _fallback_pick(menu: Dict[str, Any], budget: Optional[float], exclude_tags: List[str], need_drink: bool, top_k: int) -> Dict[str, Any]:
+    """當雲端 DB 連不到時，用 menu.json 快取做簡單推薦。
+
+    策略：
+      - 先過濾掉含排除標籤的品項
+      - 依是否需要飲料，把飲料類別分類
+      - 優先挑主菜，再加 1~2 飲料，貪婪控制預算
+    """
+    BEVERAGE_CATEGORY_KEYWORDS = ["酒", "啤酒", "清酒", "紅酒", "果汁", "茶", "飲料"]
+    MARKET_PRICE_ASSUME = 350.0
+
+    all_items = _flatten_menu(menu)
+    if not all_items:
+        return {"items": [], "notes": "menu.json 空白，無法推薦"}
+
+    def is_excluded(item: Dict[str, Any]) -> bool:
+        tags = [str(t) for t in (item.get("tags") or [])]
+        name = str(item.get("name") or "")
+        return any(tag in tags or tag in name for tag in exclude_tags)
+
+    def is_drink(item: Dict[str, Any]) -> bool:
+        cat = str(item.get("category") or "")
+        return any(k in cat for k in BEVERAGE_CATEGORY_KEYWORDS)
+
+    filtered = [i for i in all_items if not is_excluded(i)]
+    if not filtered:
+        return {"items": [], "notes": "排除條件過多，沒有符合的餐點"}
+
+    main_items = [i for i in filtered if not is_drink(i)]
+    drink_items = [i for i in filtered if is_drink(i)]
+
+    picks: List[Dict[str, Any]] = []
+    total = 0.0
+
+    def price_of(item: Dict[str, Any]) -> float:
+        p = item.get("price")
+        try:
+            return float(p) if p not in (None, "", "時價", 0) else MARKET_PRICE_ASSUME
+        except Exception:
+            return MARKET_PRICE_ASSUME
+
+    # 主菜優先
+    for it in main_items:
+        if len(picks) >= top_k:
+            break
+        p = price_of(it)
+        if isinstance(budget, (int, float)) and budget > 0:
+            reserve = MARKET_PRICE_ASSUME if need_drink else 0.0
+            if total + p + reserve > float(budget):
+                continue
+        picks.append({
+            "name": it.get("name"),
+            "price": None if it.get("price") in (None, "", "時價", 0) else it.get("price"),
+            "category": it.get("category"),
+            "reason": "依據您的條件挑選的主菜",
+            "type": "main",
+            "effectivePrice": p,
+        })
+        total += p
+
+    # 飲料需求
+    if need_drink and drink_items:
+        for it in drink_items[:2]:
+            if len(picks) >= top_k:
+                break
+            p = price_of(it)
+            if isinstance(budget, (int, float)) and budget > 0 and total + p > float(budget):
+                continue
+            picks.append({
+                "name": it.get("name"),
+                "price": None if it.get("price") in (None, "", "時價", 0) else it.get("price"),
+                "category": it.get("category"),
+                "reason": "幫您搭配飲料",
+                "type": "drink",
+                "effectivePrice": p,
+            })
+            total += p
+
+    # 若還不夠，補齊其他品項
+    if len(picks) < top_k:
+        for it in filtered:
+            if len(picks) >= top_k:
+                break
+            if any(p.get("name") == it.get("name") for p in picks):
+                continue
+            p = price_of(it)
+            if isinstance(budget, (int, float)) and budget > 0 and total + p > float(budget):
+                continue
+            picks.append({
+                "name": it.get("name"),
+                "price": None if it.get("price") in (None, "", "時價", 0) else it.get("price"),
+                "category": it.get("category"),
+                "reason": "為了湊足推薦數量的候選",
+                "type": "main",
+                "effectivePrice": p,
+            })
+            total += p
+
+    notes = "(已使用 menu.json fallback，雲端資料庫未連線)"
+    return {"items": picks, "notes": notes}
+
+
 def recommend(menu: Dict[str, Any], prefs: Optional[Dict[str, Any]] = None, top_k: int = 5, model: Optional[str] = None) -> Dict[str, Any]:
     """根據偏好與資料庫內容做推薦（不辣 / 要飲料 / 人數感知）。
 
@@ -141,13 +262,24 @@ def recommend(menu: Dict[str, Any], prefs: Optional[Dict[str, Any]] = None, top_
             if t not in exclude_tags:
                 exclude_tags.append(t)
 
-    # 2) 呼叫資料庫，取得一批候選清單
+    # 2) 呼叫資料庫，取得一批候選清單；若失敗改用 menu.json fallback
+    rows: List[Dict[str, Any]] = []
+    db_error: Optional[Exception] = None
     try:
         rows = query_menu(budget=budget, must_tags=must_tags, exclude_tags=exclude_tags)
     except Exception as e:
-        return {"items": [], "notes": f"資料庫查詢失敗：{e}"}
+        db_error = e
 
     if not rows:
+        # fallback 使用 menu.json
+        fb = _fallback_pick(menu, budget, exclude_tags, need_drink, top_k)
+        if fb.get("items"):
+            if db_error:
+                fb["notes"] = f"(DB 連線失敗改用 menu.json) {fb.get('notes','')}"
+            return fb
+        # fallback 也沒料
+        if db_error:
+            return {"items": [], "notes": f"資料庫查詢失敗：{db_error}"}
         return {"items": [], "notes": "找不到符合預算或口味的餐點"}
 
     # 輔助：判斷菜色類型，方便後續輸出語氣

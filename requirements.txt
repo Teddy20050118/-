@@ -7,3 +7,6 @@ mysql-connector-python>=9.0
 
 # Optional: log analysis script
 matplotlib>=3.8
+
+# Crawler (Google Maps scraping)
+playwright>=1.41
