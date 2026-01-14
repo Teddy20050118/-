@@ -49,51 +49,42 @@ async def search_foodpanda(page: Page, query: str, city: str = "taichung") -> Li
     Returns:
         餐廳列表（含 vendor_code 供後續爬取菜單）
     """
-    # Foodpanda 搜尋頁面
-    search_url = f"https://www.foodpanda.com.tw/city/{city}"
+    from urllib.parse import quote
+    
+    # 直接用搜尋 URL（不需要找搜尋框）
+    encoded_query = quote(query)
+    search_url = f"https://www.foodpanda.com.tw/restaurants/new?q={encoded_query}&vertical=restaurants"
     
     try:
+        print(f"前往搜尋頁面：{search_url}")
         await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(2000)
-        
-        # 尋找搜尋框並輸入關鍵字
-        search_input_selectors = [
-            'input[placeholder*="搜尋"]',
-            'input[placeholder*="Search"]',
-            'input[type="search"]',
-            'input[data-testid="search-input"]',
-        ]
-        
-        search_input = None
-        for selector in search_input_selectors:
-            search_input = await page.query_selector(selector)
-            if search_input:
-                break
-        
-        if not search_input:
-            print("未找到搜尋框")
-            return []
-        
-        # 輸入搜尋關鍵字
-        await search_input.fill(query)
-        await search_input.press('Enter')
         await page.wait_for_timeout(3000)
         
         # 提取搜尋結果
         restaurants = []
         
-        # Foodpanda 餐廳卡片選擇器
+        # Foodpanda 餐廳卡片選擇器（多種備選）
         card_selectors = [
-            'a[data-testid^="vendor-"]',
-            '[data-testid="vendor-card"]',
+            'a[data-testid^="vendor-card"]',
             'a[href*="/restaurant/"]',
+            '[data-testid*="vendor"]',
+            'a.vendor-list-item',
         ]
         
         cards = []
         for selector in card_selectors:
             cards = await page.query_selector_all(selector)
-            if cards:
+            if cards and len(cards) > 0:
+                print(f"找到 {len(cards)} 個餐廳卡片（使用選擇器：{selector}）")
                 break
+        
+        if not cards:
+            print("未找到任何餐廳卡片")
+            # 保存 HTML 供除錯
+            html = await page.content()
+            Path("debug_foodpanda.html").write_text(html, encoding='utf-8')
+            print("已保存頁面到 debug_foodpanda.html")
+            return []
         
         for card in cards[:10]:  # 最多取 10 間
             try:

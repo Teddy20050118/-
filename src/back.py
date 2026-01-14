@@ -111,9 +111,22 @@ class CrawlResp(BaseModel):
     itemCount: Optional[int] = None
     restaurants: Optional[List[dict]] = None
 
-class FoodpandaReq(BaseModel):
-    restaurantName: str
+class FoodpandaSearchReq(BaseModel):
+    """搜尋 Foodpanda 餐廳（只列出，不爬菜單）"""
+    query: str
     city: Optional[str] = "taichung"
+    maxResults: Optional[int] = 10
+
+class FoodpandaSearchResp(BaseModel):
+    """搜尋結果"""
+    success: bool
+    message: str
+    restaurants: Optional[List[dict]] = None
+
+class FoodpandaReq(BaseModel):
+    """爬取特定餐廳的菜單"""
+    vendorCode: str  # Foodpanda 餐廳代碼（例如：s1ab）
+    restaurantName: Optional[str] = None  # 顯示用
 
 class FoodpandaResp(BaseModel):
     success: bool
@@ -190,51 +203,113 @@ async def api_crawl(req: CrawlReq):
             message=f"爬取失敗：{str(e)}"
         )
 
+@app.post("/api/search-foodpanda", response_model=FoodpandaSearchResp)
+async def api_search_foodpanda(req: FoodpandaSearchReq):
+    """
+    在 Foodpanda 搜尋餐廳（不爬菜單，只列出餐廳）
+    
+    這是一個輕量級的搜尋端點，用於：
+    1. 使用者輸入關鍵字（例如：「牛排」、「火鍋」）
+    2. 快速返回餐廳清單（含 vendorCode）
+    3. 使用者選擇後，再用 /api/crawl-foodpanda 爬取菜單
+    
+    優勢：
+    - 快速（約 3-5 秒）
+    - 不需要爬取菜單
+    - 使用者可以先預覽餐廳再決定
+    """
+    try:
+        sys.path.insert(0, PROJECT_ROOT)
+        from foodpanda_crawler import search_foodpanda
+        from playwright.async_api import async_playwright
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            )
+            
+            restaurants = await search_foodpanda(page, req.query, req.city)
+            await browser.close()
+            
+            if not restaurants:
+                return FoodpandaSearchResp(
+                    success=False,
+                    message=f"找不到「{req.query}」相關的餐廳"
+                )
+            
+            return FoodpandaSearchResp(
+                success=True,
+                message=f"找到 {len(restaurants)} 間餐廳",
+                restaurants=[{
+                    "name": r.name,
+                    "vendorCode": r.vendor_code,
+                    "rating": r.rating,
+                    "deliveryTime": r.delivery_time,
+                    "url": r.url,
+                } for r in restaurants[:req.maxResults]]
+            )
+    
+    except Exception as e:
+        return FoodpandaSearchResp(
+            success=False,
+            message=f"搜尋失敗：{str(e)}"
+        )
+
 @app.post("/api/crawl-foodpanda", response_model=FoodpandaResp)
 async def api_crawl_foodpanda(req: FoodpandaReq):
     """
     從 Foodpanda 爬取指定餐廳的完整菜單
     
     前端流程：
-    1. 使用者先透過 /api/crawl 搜尋 Google Maps 找到餐廳清單
-    2. 使用者選擇感興趣的餐廳
-    3. 呼叫此 API 從 Foodpanda 爬取該餐廳的完整菜單
+    1. 使用者透過 /api/search-foodpanda 搜尋餐廳
+    2. 選擇感興趣的餐廳（獲得 vendorCode）
+    3. 呼叫此 API 爬取完整菜單
     
     注意：這是耗時操作（10-30秒），建議前端顯示 loading
     """
     try:
-        # 動態導入 Foodpanda 爬蟲
-        try:
-            sys.path.insert(0, PROJECT_ROOT)
-            from foodpanda_crawler import crawl_foodpanda, to_menu_json
-        except ImportError as e:
-            raise HTTPException(
-                status_code=503,
-                detail=f"Foodpanda 爬蟲功能未啟用：{e}"
+        sys.path.insert(0, PROJECT_ROOT)
+        from foodpanda_crawler import crawl_foodpanda_menu, FoodpandaRestaurant, to_menu_json
+        from playwright.async_api import async_playwright
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             )
-        
-        # 執行爬蟲
-        restaurant = await crawl_foodpanda(req.restaurantName, req.city)
-        
-        if not restaurant:
+            
+            # 建立餐廳物件
+            restaurant = FoodpandaRestaurant(
+                name=req.restaurantName or req.vendorCode,
+                vendor_code=req.vendorCode,
+                url=f"https://www.foodpanda.com.tw/restaurant/{req.vendorCode}",
+                menu_items=[]
+            )
+            
+            # 爬取菜單
+            await crawl_foodpanda_menu(page, restaurant)
+            await browser.close()
+            
+            if not restaurant.menu_items:
+                return FoodpandaResp(
+                    success=False,
+                    message=f"無法爬取「{restaurant.name}」的菜單，可能餐廳暫停營業或網頁結構改變"
+                )
+            
+            menu_data = to_menu_json(restaurant)
+            
             return FoodpandaResp(
-                success=False,
-                message=f"在 Foodpanda 找不到餐廳「{req.restaurantName}」"
+                success=True,
+                message=f"成功爬取 {restaurant.name} 的菜單，共 {len(menu_data)} 道菜",
+                restaurant={
+                    "name": restaurant.name,
+                    "rating": restaurant.rating,
+                    "deliveryTime": restaurant.delivery_time,
+                    "url": restaurant.url,
+                },
+                menuItems=menu_data
             )
-        
-        menu_data = to_menu_json(restaurant)
-        
-        return FoodpandaResp(
-            success=True,
-            message=f"成功爬取 {restaurant.name} 的菜單，共 {len(menu_data)} 道菜",
-            restaurant={
-                "name": restaurant.name,
-                "rating": restaurant.rating,
-                "deliveryTime": restaurant.delivery_time,
-                "url": restaurant.url,
-            },
-            menuItems=menu_data
-        )
         
     except Exception as e:
         return FoodpandaResp(
