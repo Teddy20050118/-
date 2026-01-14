@@ -111,6 +111,16 @@ class CrawlResp(BaseModel):
     itemCount: Optional[int] = None
     restaurants: Optional[List[dict]] = None
 
+class FoodpandaReq(BaseModel):
+    restaurantName: str
+    city: Optional[str] = "taichung"
+
+class FoodpandaResp(BaseModel):
+    success: bool
+    message: str
+    restaurant: Optional[dict] = None
+    menuItems: Optional[List[dict]] = None
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -176,6 +186,58 @@ async def api_crawl(req: CrawlReq):
         
     except Exception as e:
         return CrawlResp(
+            success=False,
+            message=f"爬取失敗：{str(e)}"
+        )
+
+@app.post("/api/crawl-foodpanda", response_model=FoodpandaResp)
+async def api_crawl_foodpanda(req: FoodpandaReq):
+    """
+    從 Foodpanda 爬取指定餐廳的完整菜單
+    
+    前端流程：
+    1. 使用者先透過 /api/crawl 搜尋 Google Maps 找到餐廳清單
+    2. 使用者選擇感興趣的餐廳
+    3. 呼叫此 API 從 Foodpanda 爬取該餐廳的完整菜單
+    
+    注意：這是耗時操作（10-30秒），建議前端顯示 loading
+    """
+    try:
+        # 動態導入 Foodpanda 爬蟲
+        try:
+            sys.path.insert(0, PROJECT_ROOT)
+            from foodpanda_crawler import crawl_foodpanda, to_menu_json
+        except ImportError as e:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Foodpanda 爬蟲功能未啟用：{e}"
+            )
+        
+        # 執行爬蟲
+        restaurant = await crawl_foodpanda(req.restaurantName, req.city)
+        
+        if not restaurant:
+            return FoodpandaResp(
+                success=False,
+                message=f"在 Foodpanda 找不到餐廳「{req.restaurantName}」"
+            )
+        
+        menu_data = to_menu_json(restaurant)
+        
+        return FoodpandaResp(
+            success=True,
+            message=f"成功爬取 {restaurant.name} 的菜單，共 {len(menu_data)} 道菜",
+            restaurant={
+                "name": restaurant.name,
+                "rating": restaurant.rating,
+                "deliveryTime": restaurant.delivery_time,
+                "url": restaurant.url,
+            },
+            menuItems=menu_data
+        )
+        
+    except Exception as e:
+        return FoodpandaResp(
             success=False,
             message=f"爬取失敗：{str(e)}"
         )
