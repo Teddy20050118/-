@@ -12,12 +12,26 @@ SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
+# 確保可以從根目錄匯入模組
+PROJECT_ROOT = os.path.abspath(os.path.join(SRC_DIR, os.pardir))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 # 從主程式匯入
 from main import (
     Menu, Preferences, ConversationTurn,
     _validate_menu, normalize_menu, write_menu_json,
     generate_conversation,
 )
+
+# 匯入爬蟲模組
+try:
+    import quick_manual_crawl
+    CRAWLER_AVAILABLE = True
+except ImportError as e:
+    print(f"[警告] 無法匯入 quick_manual_crawl: {e}")
+    CRAWLER_AVAILABLE = False
+
 # 專案路徑設定
 PROJECT_ROOT = os.path.abspath(os.path.join(SRC_DIR, os.pardir))
 WEB_DIR = os.path.join(PROJECT_ROOT, "web")
@@ -265,6 +279,16 @@ class FoodpandaResp(BaseModel):
     message: str
     restaurant: Optional[dict] = None
     menuItems: Optional[List[dict]] = None
+
+class UpdateMenuReq(BaseModel):
+    """遠端觸發爬蟲更新菜單"""
+    restaurant_name: str  # 餐廳名稱（例如：肯德基大甲）
+
+class UpdateMenuResp(BaseModel):
+    status: str  # "success" 或 "error"
+    message: str
+    restaurant_name: Optional[str] = None
+    menu_items_count: Optional[int] = None
 
 @app.get("/health")
 def health():
@@ -572,6 +596,100 @@ def switch_restaurant(restaurant_name: str):
         "message": f" 已切換至 {restaurant_name}",
         "activeRestaurant": ACTIVE_RESTAURANT
     }
+
+@app.post("/api/update-menu", response_model=UpdateMenuResp)
+async def update_menu(req: UpdateMenuReq):
+    """遠端觸發爬蟲更新菜單"""
+    
+    if not CRAWLER_AVAILABLE:
+        return UpdateMenuResp(
+            status="error",
+            message="爬蟲模組未安裝或無法匯入"
+        )
+    
+    restaurant_name = req.restaurant_name
+    print(f"\n{'='*60}")
+    print(f"[API] 收到遠端爬蟲請求")
+    print(f"[API] 目標餐廳: {restaurant_name}")
+    print(f"{'='*60}\n")
+    
+    try:
+        # 執行爬蟲
+        print(f"[爬蟲] 開始爬取: {restaurant_name}")
+        restaurant = await quick_manual_crawl.quick_crawl(restaurant_name)
+        
+        if restaurant and restaurant.menu_items:
+            print(f"[爬蟲] 成功爬取 {len(restaurant.menu_items)} 道菜")
+            
+            # 儲存菜單 JSON
+            import json
+            from pathlib import Path
+            from dataclasses import asdict
+            
+            output_file = os.path.join(PROJECT_ROOT, f'menu_{restaurant.name.replace(" ", "_")}.json')
+            Path(output_file).write_text(
+                json.dumps(asdict(restaurant), ensure_ascii=False, indent=2),
+                encoding='utf-8'
+            )
+            print(f"[爬蟲] 菜單已儲存: {output_file}")
+            
+            # 重新載入菜單到系統中
+            try:
+                global RESTAURANT_MENUS, ACTIVE_RESTAURANT
+                
+                # 重新讀取剛儲存的菜單檔案
+                with open(output_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                if "menu_items" in data and isinstance(data["menu_items"], list):
+                    crawled_menu: Menu = {
+                        "restaurants": {
+                            restaurant.name: {
+                                "name": data.get('name', restaurant.name),
+                                "categories": {
+                                    "全部菜色": {
+                                        "items": [
+                                            {
+                                                "name": item.get('name', ''),
+                                                "price": item.get('price', '價格未提供').replace('$', '').replace(',', '').strip() if isinstance(item.get('price'), str) else item.get('price')
+                                            }
+                                            for item in data.get('menu_items', [])
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    RESTAURANT_MENUS[restaurant.name] = crawled_menu
+                    ACTIVE_RESTAURANT = restaurant.name
+                    menu = crawled_menu
+                    print(f"[系統] 已將 {restaurant.name} 設為活動餐廳")
+            except Exception as e:
+                print(f"[警告] 重新載入菜單失敗: {e}")
+            
+            return UpdateMenuResp(
+                status="success",
+                message=f"成功爬取 {restaurant.name} 的菜單",
+                restaurant_name=restaurant.name,
+                menu_items_count=len(restaurant.menu_items)
+            )
+        else:
+            print(f"[爬蟲] 爬取失敗：未取得菜單資料")
+            return UpdateMenuResp(
+                status="error",
+                message="爬取失敗：未取得菜單資料，請確認是否手動點擊了菜單頁面"
+            )
+            
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[錯誤] 爬蟲執行失敗: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
+        return UpdateMenuResp(
+            status="error",
+            message=f"爬蟲執行失敗: {error_msg}"
+        )
 
 if __name__ == "__main__":
     import uvicorn
