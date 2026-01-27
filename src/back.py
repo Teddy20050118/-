@@ -66,6 +66,138 @@ else:
             menu = json.load(f)
         _validate_menu(menu)
 
+# 啟動時自動載入最近爬取的菜單
+def load_latest_crawled_menu() -> Optional[Menu]:
+    """檢查是否有最近爬取的菜單檔案，並自動載入"""
+    import glob
+    
+    # 尋找所有 menu_*.json 檔案
+    menu_files = glob.glob(os.path.join(PROJECT_ROOT, "menu_*.json"))
+    
+    if not menu_files:
+        return None
+    
+    # 找到最新的檔案（依修改時間）
+    latest_file = max(menu_files, key=os.path.getmtime)
+    
+    try:
+        with open(latest_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        # 提取餐廳名稱
+        filename = os.path.basename(latest_file)
+        restaurant_name = filename.replace("menu_", "").replace(".json", "")
+        
+        # 轉換為系統菜單格式
+        if "menu_items" in data and isinstance(data["menu_items"], list):
+            crawled_menu: Menu = {
+                "restaurants": {
+                    restaurant_name: {
+                        "name": data.get('name', restaurant_name),
+                        "categories": {
+                            "全部菜色": {
+                                "items": [
+                                    {
+                                        "name": item.get('name', ''),
+                                        "price": item.get('price', '價格未提供').replace('$', '').replace(',', '').strip() if isinstance(item.get('price'), str) else item.get('price')
+                                    }
+                                    for item in data.get('menu_items', [])
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+            print(f" 自動載入最近爬取的菜單：{restaurant_name} ({len(data.get('menu_items', []))} 項)")
+            return crawled_menu
+    except Exception as e:
+        print(f" 載入爬取菜單失敗：{e}")
+    
+    return None
+
+# 多餐廳支援：使用字典管理所有餐廳菜單
+RESTAURANT_MENUS: Dict[str, Menu] = {}
+ACTIVE_RESTAURANT: Optional[str] = None
+
+# 1️ 先載入預設菜單 (menu.json - 大肥鵝)
+if MENU_PATH and os.path.exists(MENU_PATH):
+    try:
+        with open(MENU_PATH, "r", encoding="utf-8") as f:
+            default_menu_data = json.load(f)
+        
+        # 判斷是舊格式還是新格式
+        if "categories" in default_menu_data:
+            # 舊格式：轉換成新格式
+            RESTAURANT_MENUS["大肥鵝"] = {
+                "restaurants": {
+                    "大肥鵝": {
+                        "name": "大肥鵝",
+                        "categories": {
+                            cat["name"]: {
+                                "items": cat.get("items", [])
+                            }
+                            for cat in default_menu_data.get("categories", [])
+                        }
+                    }
+                }
+            }
+            print(f" 載入預設餐廳：大肥鵝")
+        elif "restaurants" in default_menu_data:
+            # 新格式：直接使用
+            for rest_name in default_menu_data["restaurants"]:
+                RESTAURANT_MENUS[rest_name] = default_menu_data
+                print(f" 載入餐廳：{rest_name}")
+    except Exception as e:
+        print(f" 載入預設菜單失敗：{e}")
+
+# 2️⃣ 載入所有爬取的菜單 (menu_*.json)
+import glob
+menu_files = glob.glob(os.path.join(PROJECT_ROOT, "menu_*.json"))
+for menu_file in menu_files:
+    try:
+        with open(menu_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        filename = os.path.basename(menu_file)
+        restaurant_name = filename.replace("menu_", "").replace(".json", "")
+        
+        if "menu_items" in data and isinstance(data["menu_items"], list):
+            crawled_menu: Menu = {
+                "restaurants": {
+                    restaurant_name: {
+                        "name": data.get('name', restaurant_name),
+                        "categories": {
+                            "全部菜色": {
+                                "items": [
+                                    {
+                                        "name": item.get('name', ''),
+                                        "price": item.get('price', '價格未提供').replace('$', '').replace(',', '').strip() if isinstance(item.get('price'), str) else item.get('price')
+                                    }
+                                    for item in data.get('menu_items', [])
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+            RESTAURANT_MENUS[restaurant_name] = crawled_menu
+            print(f" 載入餐廳菜單：{restaurant_name} ({len(data.get('menu_items', []))} 項)")
+    except Exception as e:
+        print(f" 載入 {menu_file} 失敗：{e}")
+
+# 設定預設活動餐廳（最新修改的）
+if RESTAURANT_MENUS:
+    latest_file = max(menu_files, key=os.path.getmtime)
+    latest_name = os.path.basename(latest_file).replace("menu_", "").replace(".json", "")
+    ACTIVE_RESTAURANT = latest_name
+    menu = RESTAURANT_MENUS[latest_name]
+    print(f" 當前活動餐廳：{ACTIVE_RESTAURANT}")
+else:
+    # 使用預設 menu
+    if MENU_PATH and os.path.exists(MENU_PATH):
+        ACTIVE_RESTAURANT = "預設餐廳"
+        RESTAURANT_MENUS["預設餐廳"] = menu
+
 # 簡單 session 記憶
 SESSIONS: Dict[str, Dict[str, object]] = {}
 
@@ -206,115 +338,183 @@ async def api_crawl(req: CrawlReq):
 @app.post("/api/search-foodpanda", response_model=FoodpandaSearchResp)
 async def api_search_foodpanda(req: FoodpandaSearchReq):
     """
-    在 Foodpanda 搜尋餐廳（不爬菜單，只列出餐廳）
-    
-    這是一個輕量級的搜尋端點，用於：
-    1. 使用者輸入關鍵字（例如：「牛排」、「火鍋」）
-    2. 快速返回餐廳清單（含 vendorCode）
-    3. 使用者選擇後，再用 /api/crawl-foodpanda 爬取菜單
-    
-    優勢：
-    - 快速（約 3-5 秒）
-    - 不需要爬取菜單
-    - 使用者可以先預覽餐廳再決定
+    搜尋餐廳（改用 Google 菜單爬蟲）
     """
-    try:
-        sys.path.insert(0, PROJECT_ROOT)
-        from foodpanda_crawler import search_foodpanda
-        from playwright.async_api import async_playwright
-        
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            )
-            
-            restaurants = await search_foodpanda(page, req.query, req.city)
-            await browser.close()
-            
-            if not restaurants:
-                return FoodpandaSearchResp(
-                    success=False,
-                    message=f"找不到「{req.query}」相關的餐廳"
-                )
-            
-            return FoodpandaSearchResp(
-                success=True,
-                message=f"找到 {len(restaurants)} 間餐廳",
-                restaurants=[{
-                    "name": r.name,
-                    "vendorCode": r.vendor_code,
-                    "rating": r.rating,
-                    "deliveryTime": r.delivery_time,
-                    "url": r.url,
-                } for r in restaurants[:req.maxResults]]
-            )
-    
-    except Exception as e:
-        return FoodpandaSearchResp(
-            success=False,
-            message=f"搜尋失敗：{str(e)}"
-        )
+    return FoodpandaSearchResp(
+        success=True,
+        message=f" 找到餐廳：{req.query}",
+        restaurants=[{
+            "name": req.query,
+            "vendorCode": req.query,  # 直接用搜尋關鍵字
+            "rating": None,
+            "deliveryTime": None,
+            "url": f"https://www.google.com/search?q={req.query}"
+        }]
+    )
 
 @app.post("/api/crawl-foodpanda", response_model=FoodpandaResp)
 async def api_crawl_foodpanda(req: FoodpandaReq):
     """
-    從 Foodpanda 爬取指定餐廳的完整菜單
+    爬取餐廳菜單
     
-    前端流程：
-    1. 使用者透過 /api/search-foodpanda 搜尋餐廳
-    2. 選擇感興趣的餐廳（獲得 vendorCode）
-    3. 呼叫此 API 爬取完整菜單
-    
-    注意：這是耗時操作（10-30秒），建議前端顯示 loading
+     注意：由於 Google 的反爬蟲機制，自動爬蟲可能失敗
+    如果失敗，請使用手動模式：
+    1. 手動開啟 Chrome (遠端除錯模式)
+    2. 搜尋餐廳並點擊菜單
+    3. 執行 crawler_use_existing_chrome.py
     """
     try:
-        sys.path.insert(0, PROJECT_ROOT)
-        from foodpanda_crawler import crawl_foodpanda_menu, FoodpandaRestaurant, to_menu_json
-        from playwright.async_api import async_playwright
+        import subprocess
+        import json
+        from pathlib import Path
         
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            )
+        # 使用 crawler_google_bwzfsc.py 爬取
+        restaurant_name = req.vendorCode  # vendorCode 就是餐廳名稱
+        
+        # 重要提示：此爬蟲可能被 Google 偵測為機器人而失敗
+        # 執行爬蟲（headful 模式，避免 CAPTCHA）
+        print(f"\n{'='*60}")
+        print(f" 開始爬取：{restaurant_name}")
+        print(f"{'='*60}")
+        
+        result = subprocess.run(
+[
+                r"C:\Users\User\miniforge3\python.exe",
+                "crawler_google_bwzfsc.py",
+                f"{restaurant_name} 菜單",  # 加上「菜單」關鍵字
+                "--headful"  # 使用 headful 模式避免 CAPTCHA
+            ],
+            capture_output=True,
+            text=True,
+            timeout=90,
+            cwd=r"C:\Users\User\Desktop\點餐"
+        )
+        
+        # 輸出除錯資訊
+        print(f"爬蟲返回碼: {result.returncode}")
+        print(f"爬蟲輸出: {result.stdout[:500]}")
+        if result.stderr:
+            print(f"爬蟲錯誤: {result.stderr[:500]}")
+        
+        # 讀取生成的 JSON 檔案（使用絕對路徑）
+        base_dir = Path(r"C:\Users\User\Desktop\點餐")
+        # 檔名需要包含「_菜單」因為爬蟲加了這個關鍵字
+        json_file = base_dir / f"menu_{restaurant_name.replace(' ', '_')}_菜單.json"
+        
+        # 如果找不到，試試不含「_菜單」的版本
+        if not json_file.exists():
+            json_file = base_dir / f"menu_{restaurant_name.replace(' ', '_')}.json"
+        
+        print(f"查找 JSON 檔案: {json_file}")
+        print(f"檔案存在: {json_file.exists()}")
+        
+        if json_file.exists():
+            data = json.loads(json_file.read_text(encoding='utf-8'))
+            print(f"讀取到菜單項目數: {len(data.get('menu_items', []))}")
             
-            # 建立餐廳物件
-            restaurant = FoodpandaRestaurant(
-                name=req.restaurantName or req.vendorCode,
-                vendor_code=req.vendorCode,
-                url=f"https://www.foodpanda.com.tw/restaurant/{req.vendorCode}",
-                menu_items=[]
-            )
+            menu_items = []
+            for item in data.get('menu_items', []):
+                menu_items.append({
+                    "dish": item.get('name', ''),
+                    "price": item.get('price', '價格未提供')
+                })
             
-            # 爬取菜單
-            await crawl_foodpanda_menu(page, restaurant)
-            await browser.close()
-            
-            if not restaurant.menu_items:
+            # 如果菜單為空，返回失敗
+            if len(menu_items) == 0:
                 return FoodpandaResp(
                     success=False,
-                    message=f"無法爬取「{restaurant.name}」的菜單，可能餐廳暫停營業或網頁結構改變"
+                    message=f" 爬蟲執行成功但找不到菜單資料\n\n 可能原因：\n1. Google 偵測到自動化工具，返回空白頁面\n2. 餐廳名稱不完整\n3. 餐廳沒有在 Google 上架菜單\n\n 解決方法：\n使用手動爬蟲模式（繞過反爬蟲機制）"
                 )
             
-            menu_data = to_menu_json(restaurant)
+            # 將爬取的菜單轉換為系統菜單格式並保存到全域變數
+            # 這樣後續的對話就會使用這個菜單
+            global menu
+            crawled_menu: Menu = {
+                "restaurants": {
+                    restaurant_name: {
+                        "name": data.get('name', restaurant_name),
+                        "categories": {
+                            "全部菜色": {
+                                "items": [
+                                    {
+                                        "name": item.get('name', ''),
+                                        "price": item.get('price', '價格未提供').replace('$', '').replace(',', '').strip()
+                                    }
+                                    for item in data.get('menu_items', [])
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+            
+            # 更新多餐廳管理
+            global RESTAURANT_MENUS, ACTIVE_RESTAURANT
+            RESTAURANT_MENUS[restaurant_name] = crawled_menu
+            ACTIVE_RESTAURANT = restaurant_name
+            menu = crawled_menu
+            print(f" 已將 {restaurant_name} 加入餐廳列表並設為當前活動餐廳")
             
             return FoodpandaResp(
                 success=True,
-                message=f"成功爬取 {restaurant.name} 的菜單，共 {len(menu_data)} 道菜",
+                message=f" 成功從 Google 爬取 {restaurant_name} 的菜單",
                 restaurant={
-                    "name": restaurant.name,
-                    "rating": restaurant.rating,
-                    "deliveryTime": restaurant.delivery_time,
-                    "url": restaurant.url,
+                    "name": data.get('name', restaurant_name),
+                    "rating": None,
+                    "deliveryTime": None
                 },
-                menuItems=menu_data
+                menuItems=menu_items
             )
-        
-    except Exception as e:
+        else:
+            # 爬蟲執行失敗或沒有生成 JSON 檔案
+            
+            # 檢查返回碼
+            if result.returncode != 0:
+                error_msg = f" 爬蟲執行失敗（返回碼: {result.returncode}）\n\n"
+                
+                # 檢查是否是 CAPTCHA 問題
+                if "CAPTCHA" in result.stdout or "CAPTCHA" in result.stderr:
+                    error_msg += " 原因：Google 要求驗證身份（CAPTCHA）\n\n"
+                # 檢查是否找不到元素
+                elif "找到 .bWZFsc 數量: 0" in result.stdout:
+                    error_msg += " 原因：Google 偵測到自動化工具，返回簡化頁面\n\n"
+                    error_msg += " 解決方法：\n"
+                    error_msg += "1. 使用「手動爬蟲模式」\n"
+                    error_msg += "2. 步驟：\n"
+                    error_msg += "   a. 手動開啟 Chrome\n"
+                    error_msg += "   b. 搜尋「{} 菜單」\n".format(restaurant_name)
+                    error_msg += "   c. 點擊「菜單」標籤\n"
+                    error_msg += "   d. 執行手動爬蟲腳本\n"
+                else:
+                    error_msg += " 可能原因：\n"
+                    error_msg += "1. 餐廳名稱不正確\n"
+                    error_msg += "2. Google 上沒有此餐廳的菜單\n"
+                    error_msg += "3. 網路連線問題\n\n"
+                    error_msg += f"錯誤詳情：\n{result.stderr[:300]}"
+                
+                return FoodpandaResp(
+                    success=False,
+                    message=error_msg
+                )
+            
+            # 檔案不存在
+            return FoodpandaResp(
+                success=False,
+                message=f" 找不到菜單檔案\n\n爬蟲似乎沒有生成 JSON 檔案\n\n 建議：\n1. 檢查餐廳名稱是否正確：「{restaurant_name}」\n2. 確認 Google 上有此餐廳的菜單資訊\n3. 使用手動爬蟲模式（繞過反爬蟲機制）"
+            )
+    
+    except subprocess.TimeoutExpired:
         return FoodpandaResp(
             success=False,
-            message=f"爬取失敗：{str(e)}"
+            message=" 爬取超時（超過 90 秒）\n\nGoogle 可能正在進行驗證，請稍後再試"
+        )
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"API 錯誤: {error_detail}")
+        return FoodpandaResp(
+            success=False,
+            message=f" 系統錯誤：{str(e)}\n\n請聯繫管理員"
         )
 
 @app.post("/api/chat", response_model=ChatResp)
@@ -328,3 +528,61 @@ def api_chat(req: ChatReq):
     _log_chat(req.sessionId, req.text, reply, prefs)
 
     return {"reply": reply}
+
+# 多餐廳管理 API
+@app.get("/api/restaurants")
+def list_restaurants():
+    """列出所有可用的餐廳"""
+    restaurants_list = []
+    
+    for name, menu_data in RESTAURANT_MENUS.items():
+        # 計算總菜品數量（遍歷所有分類）
+        total_items = 0
+        restaurant_data = menu_data.get("restaurants", {}).get(name, {})
+        categories = restaurant_data.get("categories", {})
+        
+        for category_name, category_data in categories.items():
+            items = category_data.get("items", [])
+            total_items += len(items)
+        
+        restaurants_list.append({
+            "name": name,
+            "active": name == ACTIVE_RESTAURANT,
+            "itemCount": total_items
+        })
+    
+    return {
+        "restaurants": restaurants_list,
+        "activeRestaurant": ACTIVE_RESTAURANT
+    }
+
+@app.post("/api/switch-restaurant")
+def switch_restaurant(restaurant_name: str):
+    """切換當前活動餐廳"""
+    global ACTIVE_RESTAURANT, menu
+    
+    if restaurant_name not in RESTAURANT_MENUS:
+        raise HTTPException(404, f"餐廳 '{restaurant_name}' 不存在")
+    
+    ACTIVE_RESTAURANT = restaurant_name
+    menu = RESTAURANT_MENUS[restaurant_name]
+    
+    return {
+        "success": True,
+        "message": f" 已切換至 {restaurant_name}",
+        "activeRestaurant": ACTIVE_RESTAURANT
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # 可以用環境變數自訂 host 和 port
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "7890"))
+    
+    print(f" 啟動後端服務...")
+    print(f" 訪問: http://localhost:{port}")
+    print(f" 靜態檔案: ../web")
+    print(f" 爬蟲: crawler_google_bwzfsc.py")
+    print(f"\n按 Ctrl+C 停止服務\n")
+    uvicorn.run(app, host=host, port=port)

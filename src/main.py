@@ -50,7 +50,7 @@ def _cli_run(args: List[str], input_text: Optional[str] = None, timeout: float =
             creationflags |= subprocess.CREATE_NO_WINDOW
 
     proc = subprocess.run(
-        [OLLAMA_BIN, *args],
+[OLLAMA_BIN, *args],
         input=(input_text.encode("utf-8") if input_text is not None else None),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -78,7 +78,7 @@ except Exception:
     ollama_ensure_daemon = None  # type: ignore
 
 
-#  型別定義 
+# 型別定義 
 class Option(TypedDict, total=False):
     name: str
     extraPrice: Optional[float]
@@ -158,7 +158,7 @@ def normalize_menu(menu: Menu) -> Dict[str, int]:
         is_bev = _is_beverage_category(cat.get('name', ''))
         for item in cat.get('items', []):
             tags = item.get('tags', [])
-            #   時價標籤
+            # 時價標籤
             if item.get('price') == 0:
                 if 'tags' not in item:
                     item['tags'] = []
@@ -167,7 +167,7 @@ def normalize_menu(menu: Menu) -> Dict[str, int]:
                     tags.append('時價')
                     changed_market += 1
 
-            #   飲品移除鹹度
+            # 飲品移除鹹度
             if is_bev and tags:
                 before = len(tags)
                 item['tags'] = [t for t in tags if not (t.startswith('鹹度') and t[2:].isdigit())]
@@ -180,7 +180,74 @@ def normalize_menu(menu: Menu) -> Dict[str, int]:
 _SPICE_WORDS = ["不辣", "微辣", "小辣", "中辣", "大辣", "很辣"]
 
 
+def extract_prefs_with_llm(text: str) -> Preferences:
+    """ 使用 LLM 智能提取使用者偏好（語意理解）"""
+    try:
+        from ollama_fuc import chat
+        
+        # 使用更小更快的模型（llama3.1 或 gemma3）
+        model = os.environ.get("PREF_MODEL", "gemma3:latest")
+        
+        prompt = f"""請分析使用者訊息，提取點餐偏好。只回傳 JSON 格式，不要其他文字。
+
+偏好欄位說明：
+- preferredDish: 想吃的菜品類型（如："漢堡"、"吐司"、"貝果"、"義大利麵"、"燉飯"等）
+- budget: 預算金額（數字）
+- spiceLevel: 辣度（"不辣"、"微辣"、"小辣"、"中辣"、"大辣"）
+- cuisine: 菜系（"中式"、"日式"、"美式"、"義式"等）
+- needDrink: 是否要飲料（true/false）
+  * 如果說「不要飲料」、「不含飲料」、「無飲料」→ false
+  * 如果說「要飲料」、「加飲料」、「來杯飲料」→ true
+  * 沒提到飲料 → 不要包含此欄位
+- excludes: 忌口食材列表（陣列）
+  * 「不要牛肉」→ ["牛肉"]
+  * 「不吃辣、不要花生」→ ["辣", "花生"]
+
+使用者訊息: "{text}"
+
+請回傳 JSON（如果某項沒提到就不要包含該欄位）:
+"""
+        
+        response = chat([{"role": "user", "content": prompt}], model=model, timeout=60.0)
+        print(f" [LLM偏好] 原始回應: {response[:200]}")
+        
+        # 提取 JSON
+        import json
+        import re
+        
+        # 嘗試直接解析
+        try:
+            prefs = json.loads(response)
+            print(f" [LLM偏好] 成功: {prefs}")
+            return prefs
+        except:
+            # 嘗試提取 JSON 區塊
+            json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
+            if json_match:
+                prefs = json.loads(json_match.group(0))
+                print(f" [LLM偏好] 提取成功: {prefs}")
+                return prefs
+            else:
+                print(f" [LLM偏好] 解析失敗，降級")
+                return {}
+    except Exception as e:
+        print(f" [LLM偏好] 錯誤: {e}")
+        return {}
+
+
 def extract_prefs_from_text(text: str) -> Preferences:
+    """主要入口：結合 LLM 智能提取 + 關鍵字提取"""
+    
+    # 檢查是否啟用 LLM（預設 false）
+    use_llm = os.environ.get("USE_LLM_EXTRACTION", "false").lower() == "true"
+    
+    if use_llm:
+        # 優先嘗試 LLM 提取
+        llm_prefs = extract_prefs_with_llm(text)
+    else:
+        llm_prefs = {}
+    
+    # 關鍵字提取（作為補充）
     prefs: Preferences = {}
     t = text.strip()
 
@@ -228,23 +295,38 @@ def extract_prefs_from_text(text: str) -> Preferences:
             prefs["cuisine"] = c
             break
     
-    need_drink_neg = re.search(r"(不要|不含|無)\s*飲料", t)
-    if need_drink_neg:
+    # 特定菜品類型偏好
+    print(f" [DEBUG extract_prefs] 使用者輸入: '{t}'")
+    if any(kw in t for kw in ["漢堡", "burger", "堡", "芝加哥堡"]):
+        prefs["preferredDish"] = "漢堡"
+        print(f" [DEBUG extract_prefs] 識別到漢堡偏好")
+    elif any(kw in t for kw in ["吐司", "toast"]):
+        prefs["preferredDish"] = "吐司"
+        print(f" [DEBUG extract_prefs] 識別到吐司偏好")
+    elif any(kw in t for kw in ["貝果", "bagel"]):
+        prefs["preferredDish"] = "貝果"
+        print(f" [DEBUG extract_prefs] 識別到貝果偏好")
+    elif any(kw in t for kw in ["套餐", "combo"]):
+        prefs["preferredDish"] = "套餐"
+        print(f" [DEBUG extract_prefs] 識別到套餐偏好")
+    
+    # 改進：檢測否定詞（不要、不含、無）+ 飲料
+    need_drink_neg = re.search(r"(不要|不含|無|不需要|別加)\s*飲料", t)
+    need_drink_pos = ("飲料" in t) or ("喝" in t) or ("飲品" in t)
+    
+    # 優先檢查 excludes 中是否有「飲料」
+    if excludes and "飲料" in excludes:
         prefs["needDrink"] = False
-    elif ("飲料" in t) or ("喝" in t):
+        print(f" [DEBUG extract_prefs] excludes 中有「飲料」，設定 needDrink=False")
+    elif need_drink_neg:
+        prefs["needDrink"] = False
+        print(f" [DEBUG extract_prefs] 識別到「不要飲料」，設定 needDrink=False")
+    elif need_drink_pos and not need_drink_neg:
+        # 只有在明確要飲料時才設定 True
         prefs["needDrink"] = True
+        print(f" [DEBUG extract_prefs] 識別到「要飲料」，設定 needDrink=True")
 
-    m2 = re.search(r"(\d{1,2})\s*人", t)
-    if m2:
-        try:
-            prefs["people"] = int(m2.group(1))
-        except Exception:
-            pass
-
-    # 飲料/人數
-    need_drink = ("飲料" in t) or ("喝" in t)
-    if need_drink:
-        prefs["needDrink"] = True
+    # 人數
     m2 = re.search(r"(\d{1,2})\s*人", t)
     if m2:
         try:
@@ -258,6 +340,8 @@ def extract_prefs_from_text(text: str) -> Preferences:
     cue_light = any(k in t for k in ["清爽", "清淡", "健康", "少油"])
 
     has_budget = prefs.get("budget") is not None
+    need_drink = prefs.get("needDrink", False)  # 從 prefs 取得，而非重複判斷
+    
     constraint_count = sum([
         1 if has_budget else 0,
         1 if need_drink else 0,
@@ -270,16 +354,27 @@ def extract_prefs_from_text(text: str) -> Preferences:
     ])
     only_budget = has_budget and constraint_count == 1
 
+    # 改進權重計算：考慮「不要飲料」的負面權重
     weights = {
         "price": 1.0 if only_budget else (0.8 if has_budget else 0.3),
         "main": 0.8 if cue_main else 0.5,
         "variety": 0.8 if cue_variety else 0.4,
-        "drink": (0.6 if need_drink else -0.3),
+        "drink": (0.6 if need_drink else -0.8),  # 不要飲料給更大的負權重
         "spice": 0.7 if prefs.get("spiceLevel") == "不辣" or cue_light else 0.2,
         "category": 0.5,  # 類別基本權重
         "cuisine": 0.6 if "cuisine" in prefs else 0.0,
     }
     prefs["weights"] = weights
+    
+    # 🔄 合併 LLM 提取的結果（LLM 結果優先）
+    for key, value in llm_prefs.items():
+        if key not in prefs or prefs[key] is None:
+            prefs[key] = value
+        # 如果 LLM 有值且更具體，覆蓋關鍵字結果
+        elif key == "preferredDish" and value:
+            prefs[key] = value
+    
+    print(f" [最終偏好] LLM:{llm_prefs} + 關鍵字 = {prefs}")
     return prefs
 
 
@@ -300,6 +395,10 @@ def merge_prefs_inplace(base: Preferences, delta: Preferences) -> None:
         base["weights"] = delta["weights"]  # 每輪依新輸入動態重算
     if "notes" in delta:
         base["notes"] = delta["notes"]
+    # 合併菜品偏好
+    if "preferredDish" in delta:
+        base["preferredDish"] = delta["preferredDish"]
+        print(f" [DEBUG merge_prefs] 更新菜品偏好: {delta['preferredDish']}")
 
 def format_recommend_text(rec: Dict[str, object]) -> str:
     """將推薦結果整理成 Gemini 風格：有段落、理由、預算計算。"""
@@ -425,7 +524,7 @@ def format_recommend_text(rec: Dict[str, object]) -> str:
             )
 
     lines.append("")
-    lines.append("💰 預算試算")
+    lines.append(" 預算試算")
     lines.append(f"餐點小計：約 $ {subtotal:.0f}")
     lines.append(f"10% 服務費：約 $ {service_fee:.0f}")
     lines.append(f"總計：約 $ {total:.0f}")
@@ -436,15 +535,16 @@ def format_recommend_text(rec: Dict[str, object]) -> str:
         else:
             lines.append(f"目前約超出預算 $ {abs(diff):.0f}，可視需求刪減或換成更平價的菜。")
 
-    lines.append("")
-    lines.append("💡 小提醒：如果想調整份量或菜色方向，直接跟我說，例如加海鮮、換辣味、或再多一壺飲料。")
+    # 移除小提醒訊息
+    # lines.append("")
+    # lines.append(" 小提醒：如果想調整份量或菜色方向，直接跟我說，例如加海鮮、換辣味、或再多一壺飲料。")
 
     lines.append("\n這組合可以嗎？需要我再微調或換一套不同風格的嗎？")
 
     return "\n".join(lines)
 
 
-#  既有骨架占位
+# 既有骨架占位
 def menu_to_json():
     # 從自由文字解析 補上文字->JSON 的parser
     return
@@ -530,9 +630,9 @@ def main():
     # 自然語言 REPL 
     prefs: Preferences = {}  # 作為 session 記憶，會被持續更新
     print("歡迎使用點餐推薦服務！")
-    print("請問有什麼需求？（例如：預算 300、不辣、不要花生，要有飲料）")
-    print("輸入 exit 離開。")
-    print("輸入 reset/清除記憶 重置偏好。")
+    print(f"請問有什麼需求？（例如：預算 300、不辣、不要花生，要有飲料）")
+    print(f"輸入 exit 離開。")
+    print(f"輸入 reset/清除記憶 重置偏好。")
     while True:
         try:
             text = input("\n> ").strip()
