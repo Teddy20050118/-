@@ -416,6 +416,12 @@ body {
   background: rgba(30, 41, 59, 0.75);
 }
 
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .chat-title {
   margin: 0;
   font-weight: 900;
@@ -425,6 +431,18 @@ body {
   margin: 4px 0 0 0;
   color: var(--fg-muted);
   font-size: 12px;
+}
+
+/* 手機版餐廳選擇器 - 預設隱藏 */
+.restaurant-select-mobile {
+  display: none;
+}
+
+/* 預設（電腦版）：按鈕分組容器不影響佈局 */
+.header-actions-left,
+.header-actions-right {
+  display: flex;
+  gap: 8px;
 }
 
 .header-actions {
@@ -737,5 +755,444 @@ body {
 .chat-rename-btn.ghost {
   background: var(--surface-strong);
 }
+
+/* ============================================
+   響應式設計 - 手機版優化
+   ============================================ */
+
+/* 平板設備 (小於 900px) */
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+  
+  .sidebar {
+    display: none;
+  }
+  
+  .chat-panel {
+    width: 100%;
+  }
+}
+
+/* 手機設備 (小於 768px) */
+@media (max-width: 768px) {
+  /* 顯示手機版餐廳選擇器 */
+  .restaurant-select-mobile {
+    display: block;
+    width: 100%;
+    max-width: 200px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .restaurant-select-mobile:hover {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-soft);
+  }
+  
+  .restaurant-select-mobile:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-soft);
+  }
+  
+  .restaurant-select-mobile option {
+    background: var(--surface);
+    color: var(--fg);
+    padding: 8px;
+  }
+  
+  [data-theme="dark"] .restaurant-select-mobile {
+    background: var(--surface-strong);
+    border-color: var(--border);
+  }
+  
+  [data-theme="dark"] .restaurant-select-mobile option {
+    background: var(--surface-strong);
+    color: var(--fg);
+  }
+  
+  /* 調整聊天標題 */
+  .chat-title {
+    font-size: 18px;
+  }
+  
+  .chat-subtitle {
+    font-size: 11px;
+  }
+  
+  /* 調整聊天內容區域 */
+  .chat-body {
+    padding: 12px;
+  }
+  
+  .conversation {
+    max-width: 100%;
+    gap: 10px;
+  }
+  
+  /* 調整訊息氣泡 */
+  .message {
+    gap: 8px;
+  }
+  
+  .avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+  
+  .bubble {
+    font-size: 15px;
+    padding: 10px 12px;
+    max-width: calc(100vw - 80px);
+    border-radius: 14px;
+  }
+  
+  /* 調整輸入區域 */
+  .chat-footer {
+    padding: 10px 12px;
+  }
+  
+  .input-area {
+    max-width: 100%;
+  }
+  
+  .input-wrapper {
+    padding: 8px;
+    gap: 8px;
+  }
+  
+  .chat-input,
+  #input {
+    font-size: 16px; /* 防止 iOS 自動縮放 */
+    min-height: 40px;
+    padding: 8px 10px;
+  }
+  
+  .send-btn,
+  #send-btn {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  
+  /* 調整標題區域 */
+  .chat-header {
+    padding: 10px 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  
+  .header-left {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .header-actions {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+  }
+  
+  .header-actions-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .header-actions-right {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 100px;
+  }
+  
+  .header-actions button {
+    width: auto; /* 自動寬度 */
+    height: auto;
+    font-size: 13px;
+    padding: 8px 4px; /* 減少內邊距 */
+    white-space: nowrap;
+    text-align: left; /* 文字靠左 */
+    border: none; /* 移除邊框 */
+    background: transparent; /* 透明背景 */
+    color: var(--primary); /* 使用主題色 */
+    text-decoration: underline; /* 加底線像連結 */
+    cursor: pointer;
+  }
+  
+  .header-actions button:hover {
+    opacity: 0.8;
+  }
+  
+  /* 移除可能的偽元素 */
+  .header-actions button::before,
+  .header-actions button::after {
+    display: none;
+    content: none;
+  }
+  
+  /* Toast 通知調整 */
+  .toast-host {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+  
+  .toast {
+    font-size: 14px;
+  }
+  
+  /* 選單調整 */
+  .chat-menu {
+    min-width: 160px;
+    font-size: 14px;
+  }
+  
+  .chat-menu-item {
+    padding: 10px 12px;
+  }
+}
+
+/* 小型手機 (小於 480px) */
+@media (max-width: 480px) {
+  /* 更緊湊的佈局 */
+  body {
+    font-size: 14px;
+  }
+  
+  .chat-header {
+    padding: 8px 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .header-left {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+  
+  .chat-title {
+    font-size: 15px;
+  }
+  
+  .restaurant-select-mobile {
+    font-size: 12px;
+    padding: 5px 8px;
+    max-width: 140px;
+    flex-shrink: 0;
+  }
+  
+  .chat-subtitle {
+    font-size: 10px;
+  }
+  
+  /* 按鈕區域：左右分欄 */
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .header-actions-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  .header-actions-right {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 85px;
+  }
+  
+  .header-actions button {
+    font-size: 12px;
+    padding: 6px 2px; /* 減少內邊距 */
+    width: auto; /* 自動寬度 */
+    height: auto;
+    white-space: nowrap;
+    border: none; /* 移除邊框 */
+    background: transparent; /* 透明背景 */
+    color: var(--primary); /* 主題色 */
+    text-decoration: underline; /* 底線 */
+    text-align: left; /* 靠左 */
+    cursor: pointer;
+  }
+  
+  .header-actions button:hover {
+    opacity: 0.8;
+  }
+  
+  /* 確保沒有多餘的視覺元素 */
+  .header-actions button::before,
+  .header-actions button::after {
+    display: none !important;
+    content: none !important;
+  }
+  
+  .header-actions-left::after,
+  .header-actions-right::after {
+    display: none !important;
+    content: none !important;
+  }
+  
+  .chat-body {
+    padding: 10px;
+  }
+  
+  .conversation {
+    gap: 8px;
+  }
+  
+  .message {
+    gap: 6px;
+  }
+  
+  .avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+  
+  .bubble {
+    font-size: 14px;
+    padding: 9px 11px;
+    max-width: calc(100vw - 70px);
+    border-radius: 12px;
+    line-height: 1.5;
+  }
+  
+  .chat-footer {
+    padding: 8px 10px;
+  }
+  
+  .input-wrapper {
+    padding: 6px;
+    gap: 6px;
+  }
+  
+  .chat-input,
+  #input {
+    font-size: 16px; /* 保持 16px 防止 iOS 縮放 */
+    min-height: 38px;
+    padding: 7px 9px;
+  }
+  
+  .send-btn,
+  #send-btn {
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  
+  .header-actions button {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+  }
+  
+  /* Toast 通知 */
+  .toast-host {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+  }
+  
+  .toast {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  
+  .toast-action {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  
+  .toast-close {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* 橫向模式優化 (手機橫放) */
+@media (max-width: 768px) and (orientation: landscape) {
+  .chat-header {
+    padding: 8px 12px;
+  }
+  
+  .chat-body {
+    padding: 10px 12px;
+  }
+  
+  .chat-footer {
+    padding: 8px 12px;
+  }
+  
+  .input-wrapper {
+    padding: 6px;
+  }
+  
+  .chat-input,
+  #input {
+    min-height: 36px;
+    max-height: 100px;
+  }
+}
+
+/* 確保在所有設備上的可讀性 */
+@media (max-width: 768px) {
+  /* 防止文字過小 */
+  .chat-list-title {
+    font-size: 13px;
+  }
+  
+  .chat-list-time {
+    font-size: 11px;
+  }
+  
+  .chat-list-preview {
+    font-size: 11px;
+  }
+  
+  /* 確保按鈕可點擊 */
+  .header-actions button,
+  .send-btn,
+  #send-btn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  
+  /* 改善觸控體驗 */
+  .chat-list-item {
+    min-height: 44px; /* iOS 建議的最小觸控目標 */
+  }
+  
+  .chat-list-more {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* 添加視口設定提示 */
+/* 請確保 HTML 中有以下 meta 標籤：
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+*/
 
 /* End of file */
