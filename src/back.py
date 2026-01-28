@@ -32,12 +32,22 @@ except ImportError as e:
     print(f"[警告] 無法匯入 quick_manual_crawl: {e}")
     CRAWLER_AVAILABLE = False
 
-# 專案路徑設定
-PROJECT_ROOT = os.path.abspath(os.path.join(SRC_DIR, os.pardir))
+# 專案路徑設定（PROJECT_ROOT 已在上方第16行定義）
 WEB_DIR = os.path.join(PROJECT_ROOT, "web")
 LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
 
 BASE_DIR = PROJECT_ROOT  # 舊變數名稱向下相容
+
+# 啟動時顯示路徑資訊
+print(f"\n{'='*60}")
+print(f"[路徑設定]")
+print(f"{'='*60}")
+print(f"SRC_DIR      = {SRC_DIR}")
+print(f"PROJECT_ROOT = {PROJECT_ROOT}")
+print(f"WEB_DIR      = {WEB_DIR}")
+print(f"LOG_DIR      = {LOG_DIR}")
+print(f"當前工作目錄  = {os.getcwd()}")
+print(f"{'='*60}\n")
 
 app = FastAPI()
 app.add_middleware(
@@ -616,22 +626,39 @@ async def update_menu(req: UpdateMenuReq):
     try:
         # 執行爬蟲
         print(f"[爬蟲] 開始爬取: {restaurant_name}")
+        print(f"[調試] PROJECT_ROOT = {PROJECT_ROOT}")
+        print(f"[調試] 當前工作目錄 = {os.getcwd()}")
+        
         restaurant = await quick_manual_crawl.quick_crawl(restaurant_name)
         
         if restaurant and restaurant.menu_items:
             print(f"[爬蟲] 成功爬取 {len(restaurant.menu_items)} 道菜")
             
-            # 儲存菜單 JSON
+            # 儲存菜單 JSON（確保使用絕對路徑）
             import json
             from pathlib import Path
             from dataclasses import asdict
             
-            output_file = os.path.join(PROJECT_ROOT, f'menu_{restaurant.name.replace(" ", "_")}.json')
+            # 使用絕對路徑確保儲存到專案根目錄
+            output_filename = f'menu_{restaurant.name.replace(" ", "_")}.json'
+            output_file = os.path.abspath(os.path.join(PROJECT_ROOT, output_filename))
+            
+            print(f"[調試] 準備儲存至: {output_file}")
+            
+            # 確保目錄存在
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            
             Path(output_file).write_text(
                 json.dumps(asdict(restaurant), ensure_ascii=False, indent=2),
                 encoding='utf-8'
             )
             print(f"[爬蟲] 菜單已儲存: {output_file}")
+            
+            # 驗證檔案確實存在
+            if os.path.exists(output_file):
+                print(f"[驗證] ✓ 檔案存在，大小: {os.path.getsize(output_file)} bytes")
+            else:
+                print(f"[錯誤] ✗ 檔案未找到: {output_file}")
             
             # 重新載入菜單到系統中
             try:
