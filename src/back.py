@@ -410,10 +410,12 @@ async def api_crawl_foodpanda(req: FoodpandaReq):
         print(f"\n{'='*60}")
         print(f" 開始爬取：{restaurant_name}")
         print(f"{'='*60}")
+        print(f"[調試] PROJECT_ROOT = {PROJECT_ROOT}")
+        print(f"[調試] 當前工作目錄 = {os.getcwd()}")
         
         result = subprocess.run(
 [
-                r"C:\Users\User\miniforge3\python.exe",
+                sys.executable,  # 使用當前 Python 解釋器
                 "crawler_google_bwzfsc.py",
                 f"{restaurant_name} 菜單",  # 加上「菜單」關鍵字
                 "--headful"  # 使用 headful 模式避免 CAPTCHA
@@ -421,7 +423,7 @@ async def api_crawl_foodpanda(req: FoodpandaReq):
             capture_output=True,
             text=True,
             timeout=90,
-            cwd=r"C:\Users\User\Desktop\點餐"
+            cwd=PROJECT_ROOT  # 使用動態路徑
         )
         
         # 輸出除錯資訊
@@ -431,7 +433,7 @@ async def api_crawl_foodpanda(req: FoodpandaReq):
             print(f"爬蟲錯誤: {result.stderr[:500]}")
         
         # 讀取生成的 JSON 檔案（使用絕對路徑）
-        base_dir = Path(r"C:\Users\User\Desktop\點餐")
+        base_dir = Path(PROJECT_ROOT)
         # 檔名需要包含「_菜單」因為爬蟲加了這個關鍵字
         json_file = base_dir / f"menu_{restaurant_name.replace(' ', '_')}_菜單.json"
         
