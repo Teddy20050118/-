@@ -308,66 +308,6 @@ def health():
 def index():
     return FileResponse(os.path.join(WEB_DIR, "web.html"))
 
-@app.post("/api/crawl", response_model=CrawlResp)
-async def api_crawl(req: CrawlReq):
-    """即時爬取 Google Maps 餐廳菜單。
-    
-    前端可以呼叫此 API，傳入搜尋關鍵字（例如 "台中 火鍋"），
-    後端會使用 crawler.py 的邏輯去抓餐廳菜單，並回傳結果。
-    
-    注意：
-    - 這是個耗時操作（5-30秒），建議前端顯示 loading 狀態
-    - 結果不會自動寫入資料庫，僅回傳給前端參考
-    - 若要整合到推薦系統，需手動合併到 menu.json 或 DB
-    """
-    try:
-        # 動態導入 crawler 模組（避免啟動時就要求 playwright）
-        try:
-            sys.path.insert(0, PROJECT_ROOT)
-            from crawler import crawl_google_maps, to_menu_json
-        except ImportError as e:
-            raise HTTPException(
-                status_code=503,
-                detail=f"爬蟲功能未啟用，缺少 playwright：{e}"
-            )
-        
-        # 執行爬蟲（async）
-        restaurants = await crawl_google_maps(
-            req.query,
-            max_shops=req.maxShops,
-            max_items_per_shop=req.maxItems,
-            headless=True,
-        )
-        
-        # 轉成 JSON 格式
-        menu_data = to_menu_json(restaurants)
-        
-        # 統計有菜單的餐廳數量
-        restaurants_with_menu = sum(1 for r in restaurants if r.menu_items and len(r.menu_items) > 0)
-        
-        message = f"成功爬取 {len(restaurants)} 間餐廳"
-        if restaurants_with_menu > 0:
-            message += f"，其中 {restaurants_with_menu} 間有菜單資料（共 {len(menu_data)} 道菜）"
-        else:
-            message += "，但這些餐廳在 Google Maps 上沒有提供結構化的菜單資料"
-        
-        return CrawlResp(
-            success=True,
-            message=message,
-            itemCount=len(menu_data),
-            restaurants=[{
-                "name": r.name,
-                "rating": r.rating,
-                "address": r.address,
-                "menuItemCount": len(r.menu_items) if r.menu_items else 0,
-            } for r in restaurants],
-        )
-        
-    except Exception as e:
-        return CrawlResp(
-            success=False,
-            message=f"爬取失敗：{str(e)}"
-        )
 
 @app.post("/api/search-foodpanda", response_model=FoodpandaSearchResp)
 async def api_search_foodpanda(req: FoodpandaSearchReq):
@@ -389,65 +329,63 @@ async def api_search_foodpanda(req: FoodpandaSearchReq):
 @app.post("/api/crawl-foodpanda", response_model=FoodpandaResp)
 async def api_crawl_foodpanda(req: FoodpandaReq):
     """
-    爬取餐廳菜單
+    爬取餐廳菜單（使用 quick_manual_crawl.py）
     
-     注意：由於 Google 的反爬蟲機制，自動爬蟲可能失敗
-    如果失敗，請使用手動模式：
-    1. 手動開啟 Chrome (遠端除錯模式)
-    2. 搜尋餐廳並點擊菜單
-    3. 執行 crawler_use_existing_chrome.py
+    這個 API 會呼叫 quick_manual_crawl.py 進行半自動爬蟲：
+    1. 自動開啟 Chrome 並搜尋餐廳
+    2. 需要手動點擊菜單頁面（避免反爬蟲機制）
+    3. 自動爬取菜單資料
     """
+    
+    if not CRAWLER_AVAILABLE:
+        return FoodpandaResp(
+            success=False,
+            message="爬蟲模組未安裝或無法匯入"
+        )
+    
     try:
-        import subprocess
         import json
         from pathlib import Path
+        from dataclasses import asdict
         
-        # 使用 crawler_google_bwzfsc.py 爬取
         restaurant_name = req.vendorCode  # vendorCode 就是餐廳名稱
         
-        # 重要提示：此爬蟲可能被 Google 偵測為機器人而失敗
-        # 執行爬蟲（headful 模式，避免 CAPTCHA）
         print(f"\n{'='*60}")
         print(f" 開始爬取：{restaurant_name}")
         print(f"{'='*60}")
         print(f"[調試] PROJECT_ROOT = {PROJECT_ROOT}")
         print(f"[調試] 當前工作目錄 = {os.getcwd()}")
+        print(f"[調試] CRAWLER_AVAILABLE = {CRAWLER_AVAILABLE}")
         
-        result = subprocess.run(
-[
-                sys.executable,  # 使用當前 Python 解釋器
-                "crawler_google_bwzfsc.py",
-                f"{restaurant_name} 菜單",  # 加上「菜單」關鍵字
-                "--headful"  # 使用 headful 模式避免 CAPTCHA
-            ],
-            capture_output=True,
-            text=True,
-            timeout=90,
-            cwd=PROJECT_ROOT  # 使用動態路徑
-        )
+        # 使用 quick_manual_crawl.quick_crawl() 進行爬取
+        restaurant = await quick_manual_crawl.quick_crawl(restaurant_name)
         
-        # 輸出除錯資訊
-        print(f"爬蟲返回碼: {result.returncode}")
-        print(f"爬蟲輸出: {result.stdout[:500]}")
-        if result.stderr:
-            print(f"爬蟲錯誤: {result.stderr[:500]}")
-        
-        # 讀取生成的 JSON 檔案（使用絕對路徑）
-        base_dir = Path(PROJECT_ROOT)
-        # 檔名需要包含「_菜單」因為爬蟲加了這個關鍵字
-        json_file = base_dir / f"menu_{restaurant_name.replace(' ', '_')}_菜單.json"
-        
-        # 如果找不到，試試不含「_菜單」的版本
-        if not json_file.exists():
-            json_file = base_dir / f"menu_{restaurant_name.replace(' ', '_')}.json"
-        
-        print(f"查找 JSON 檔案: {json_file}")
-        print(f"檔案存在: {json_file.exists()}")
-        
-        if json_file.exists():
+        if restaurant and restaurant.menu_items:
+            print(f"[爬蟲] 成功爬取 {len(restaurant.menu_items)} 道菜")
+            
+            # 儲存菜單 JSON（使用絕對路徑）
+            output_filename = f'menu_{restaurant.name.replace(" ", "_")}.json'
+            json_file = Path(PROJECT_ROOT) / output_filename
+            
+            print(f"[調試] 準備儲存至: {json_file}")
+            
+            json_file.write_text(
+                json.dumps(asdict(restaurant), ensure_ascii=False, indent=2),
+                encoding='utf-8'
+            )
+            print(f"[爬蟲] 菜單已儲存: {json_file}")
+            
+            # 驗證檔案確實存在
+            if json_file.exists():
+                print(f"[驗證] ✓ 檔案存在，大小: {json_file.stat().st_size} bytes")
+            else:
+                print(f"[錯誤] ✗ 檔案未找到: {json_file}")
+            
+            # 讀取保存的 JSON 檔案
             data = json.loads(json_file.read_text(encoding='utf-8'))
             print(f"讀取到菜單項目數: {len(data.get('menu_items', []))}")
             
+            # 轉換為前端格式
             menu_items = []
             for item in data.get('menu_items', []):
                 menu_items.append({
@@ -459,16 +397,16 @@ async def api_crawl_foodpanda(req: FoodpandaReq):
             if len(menu_items) == 0:
                 return FoodpandaResp(
                     success=False,
-                    message=f" 爬蟲執行成功但找不到菜單資料\n\n 可能原因：\n1. Google 偵測到自動化工具，返回空白頁面\n2. 餐廳名稱不完整\n3. 餐廳沒有在 Google 上架菜單\n\n 解決方法：\n使用手動爬蟲模式（繞過反爬蟲機制）"
+                    message=f" 爬蟲執行成功但找不到菜單資料\n\n 可能原因：\n1. 餐廳沒有在 Google Maps 上架菜單\n2. 餐廳名稱不完整\n3. 沒有手動點擊菜單頁面\n\n 解決方法：\n確保在 Chrome 中手動點擊了「菜單」標籤"
                 )
             
             # 將爬取的菜單轉換為系統菜單格式並保存到全域變數
-            # 這樣後續的對話就會使用這個菜單
-            global menu
+            global menu, RESTAURANT_MENUS, ACTIVE_RESTAURANT
+            
             crawled_menu: Menu = {
                 "restaurants": {
-                    restaurant_name: {
-                        "name": data.get('name', restaurant_name),
+                    restaurant.name: {
+                        "name": data.get('name', restaurant.name),
                         "categories": {
                             "全部菜色": {
                                 "items": [
@@ -485,72 +423,38 @@ async def api_crawl_foodpanda(req: FoodpandaReq):
             }
             
             # 更新多餐廳管理
-            global RESTAURANT_MENUS, ACTIVE_RESTAURANT
-            RESTAURANT_MENUS[restaurant_name] = crawled_menu
-            ACTIVE_RESTAURANT = restaurant_name
+            RESTAURANT_MENUS[restaurant.name] = crawled_menu
+            ACTIVE_RESTAURANT = restaurant.name
             menu = crawled_menu
-            print(f" 已將 {restaurant_name} 加入餐廳列表並設為當前活動餐廳")
+            print(f" 已將 {restaurant.name} 加入餐廳列表並設為當前活動餐廳")
             
             return FoodpandaResp(
                 success=True,
-                message=f" 成功從 Google 爬取 {restaurant_name} 的菜單",
+                message=f" 成功爬取 {restaurant.name} 的菜單",
                 restaurant={
-                    "name": data.get('name', restaurant_name),
+                    "name": data.get('name', restaurant.name),
                     "rating": None,
                     "deliveryTime": None
                 },
                 menuItems=menu_items
             )
         else:
-            # 爬蟲執行失敗或沒有生成 JSON 檔案
-            
-            # 檢查返回碼
-            if result.returncode != 0:
-                error_msg = f" 爬蟲執行失敗（返回碼: {result.returncode}）\n\n"
-                
-                # 檢查是否是 CAPTCHA 問題
-                if "CAPTCHA" in result.stdout or "CAPTCHA" in result.stderr:
-                    error_msg += " 原因：Google 要求驗證身份（CAPTCHA）\n\n"
-                # 檢查是否找不到元素
-                elif "找到 .bWZFsc 數量: 0" in result.stdout:
-                    error_msg += " 原因：Google 偵測到自動化工具，返回簡化頁面\n\n"
-                    error_msg += " 解決方法：\n"
-                    error_msg += "1. 使用「手動爬蟲模式」\n"
-                    error_msg += "2. 步驟：\n"
-                    error_msg += "   a. 手動開啟 Chrome\n"
-                    error_msg += "   b. 搜尋「{} 菜單」\n".format(restaurant_name)
-                    error_msg += "   c. 點擊「菜單」標籤\n"
-                    error_msg += "   d. 執行手動爬蟲腳本\n"
-                else:
-                    error_msg += " 可能原因：\n"
-                    error_msg += "1. 餐廳名稱不正確\n"
-                    error_msg += "2. Google 上沒有此餐廳的菜單\n"
-                    error_msg += "3. 網路連線問題\n\n"
-                    error_msg += f"錯誤詳情：\n{result.stderr[:300]}"
-                
-                return FoodpandaResp(
-                    success=False,
-                    message=error_msg
-                )
-            
-            # 檔案不存在
+            # 爬蟲返回但沒有菜單資料
+            print(f"[爬蟲] 爬取失敗：未取得菜單資料")
             return FoodpandaResp(
                 success=False,
-                message=f" 找不到菜單檔案\n\n爬蟲似乎沒有生成 JSON 檔案\n\n 建議：\n1. 檢查餐廳名稱是否正確：「{restaurant_name}」\n2. 確認 Google 上有此餐廳的菜單資訊\n3. 使用手動爬蟲模式（繞過反爬蟲機制）"
+                message=f" 爬取失敗：未取得菜單資料\n\n 可能原因：\n1. 沒有手動點擊菜單頁面\n2. 餐廳沒有在 Google Maps 上架菜單\n3. 餐廳名稱不正確：「{restaurant_name}」\n\n 提示：\n確保在 Chrome 彈出後，手動點擊「菜單」標籤"
             )
     
-    except subprocess.TimeoutExpired:
-        return FoodpandaResp(
-            success=False,
-            message=" 爬取超時（超過 90 秒）\n\nGoogle 可能正在進行驗證，請稍後再試"
-        )
     except Exception as e:
+        error_msg = str(e)
+        print(f"[錯誤] 爬蟲執行失敗: {error_msg}")
         import traceback
-        error_detail = traceback.format_exc()
-        print(f"API 錯誤: {error_detail}")
+        traceback.print_exc()
+        
         return FoodpandaResp(
             success=False,
-            message=f" 系統錯誤：{str(e)}\n\n請聯繫管理員"
+            message=f" 系統錯誤：{error_msg}\n\n請檢查後端日誌"
         )
 
 @app.post("/api/chat", response_model=ChatResp)

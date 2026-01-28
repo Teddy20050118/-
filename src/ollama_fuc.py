@@ -3,13 +3,7 @@ import os, json, re, shutil, subprocess, random, time
 from typing import Any, Dict, List, Optional, Tuple
 
 # 修正導入路徑（src 目錄下要用 db.db_client）
-try:
-    from db.db_client import query_menu
-except ImportError:
-    try:
-        from db_client import query_menu
-    except ImportError:
-        query_menu = None  # Fallback，不使用資料庫
+
 
 #從環境變數讀取設定
 DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
