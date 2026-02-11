@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+  <title>點餐助手</title>
+  <link rel="stylesheet" href="/web/web.css?v=20260127-responsive" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+</head>
+
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-chip">點餐助手</div>
+      </div>
+
+      <!-- 餐廳選擇器 -->
+      <div class="restaurant-selector">
+        <label class="restaurant-label">
+          選擇餐廳
+        </label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select id="restaurant-select" class="restaurant-select" style="flex: 1;">
+            <option>載入中...</option>
+          </select>
+          <button id="delete-restaurant-btn" class="ghost-btn" type="button" title="刪除當前餐廳"
+            style="color: #dc2626; flex-shrink: 0;">🗑️</button>
+        </div>
+        <div id="restaurant-info" class="restaurant-info">
+          等待載入餐廳資訊...
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button id="new-chat-btn" class="action-btn primary" type="button">＋ 新對話</button>
+      </div>
+      <div class="sidebar-chats" aria-label="對話列表">
+        <div class="chat-search">
+          <input id="chat-search" type="text" placeholder="搜尋對話…" autocomplete="off" />
+        </div>
+        <div class="chat-tools">
+          <button id="export-all-btn" class="ghost-btn" type="button">匯出</button>
+          <button id="import-json-btn" class="ghost-btn" type="button">匯入</button>
+          <input id="import-file" type="file" accept="application/json" hidden />
+        </div>
+        <div id="chat-list" class="chat-list"></div>
+      </div>
+      <div class="sidebar-meta">
+        <div>提示：右鍵或 ⋯ 可打開選單</div>
+        <div>手機：往下滑看輸入框</div>
+      </div>
+    </aside>
+
+    <main class="chat-panel">
+      <header class="chat-header">
+        <div class="header-left">
+          <p class="chat-title">點餐助手</p>
+          <!-- 手機版餐廳選擇器 -->
+          <select id="restaurant-select-mobile" class="restaurant-select-mobile">
+            <option>載入中...</option>
+          </select>
+        </div>
+        <div class="header-actions">
+          <div class="header-actions-left">
+            <button id="theme-toggle-btn" class="ghost-btn" type="button" title="切換深色模式">
+              <span id="theme-icon">深色模式</span>
+            </button>
+            <button id="clear-btn" class="ghost-btn" type="button">清空對話</button>
+            <button id="help-btn" class="ghost-btn" type="button">使用說明</button>
+          </div>
+          <div class="header-actions-right">
+            <button id="view-menu-btn" class="ghost-btn" type="button" title="查看完整菜單">查看菜單</button>
+            <button id="crawl-btn" class="ghost-btn" type="button" title="爬取新餐廳菜單">爬菜單</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="chat-body">
+        <div class="chat-bar"></div>
+
+        <div id="chat-box" class="conversation" aria-live="polite"></div>
+
+        <div id="loading" class="message bot hidden">
+          <div class="avatar">AI</div>
+          <div class="bubble loading">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          </div>
+        </div>
+      </section>
+
+      <footer class="chat-footer">
+        <div class="input-area">
+          <div class="input-wrapper">
+            <textarea id="input" class="chat-input" placeholder="輸入訊息…" rows="1"></textarea>
+            <button id="send-btn" class="send-btn" type="button">送出</button>
+          </div>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <div id="chat-menu" class="chat-menu hidden" role="menu">
+    <button class="chat-menu-item" type="button" data-action="rename">重新命名</button>
+    <button class="chat-menu-item" type="button" data-action="pin">釘選 / 取消釘選</button>
+    <button class="chat-menu-item" type="button" data-action="export">匯出此對話</button>
+    <div class="chat-menu-sep"></div>
+    <button class="chat-menu-item danger" type="button" data-action="delete">刪除</button>
+  </div>
+
+  <div id="toast-host" class="toast-host"></div>
+
+  <!-- 完整菜單 Modal -->
+  <div id="menu-modal" class="menu-modal hidden">
+    <div class="menu-modal-overlay"></div>
+    <div class="menu-modal-content">
+      <div class="menu-modal-header">
+        <h2 id="menu-modal-title" class="menu-modal-title">完整菜單</h2>
+        <button id="menu-modal-close" class="menu-modal-close" type="button" aria-label="關閉">&times;</button>
+      </div>
+      <div id="menu-modal-body" class="menu-modal-body">
+        <div class="menu-loading">載入中...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const STORAGE_KEY = 'ordering_assistant_threads_v1';
+      const ACTIVE_KEY = 'ordering_assistant_active_thread_v1';
+
+      const chatListEl = document.getElementById('chat-list');
+      const chatSearchEl = document.getElementById('chat-search');
+      const newChatBtn = document.getElementById('new-chat-btn');
+      const exportAllBtn = document.getElementById('export-all-btn');
+      const importJsonBtn = document.getElementById('import-json-btn');
+      const importFileEl = document.getElementById('import-file');
+      const crawlBtn = document.getElementById('crawl-btn');
+      const clearBtn = document.getElementById('clear-btn');
+      const helpBtn = document.getElementById('help-btn');
+      const themeToggleBtn = document.getElementById('theme-toggle-btn');
+      const themeIcon = document.getElementById('theme-icon');
+      const chatBox = document.getElementById('chat-box');
+      const chatMenuEl = document.getElementById('chat-menu');
+      const toastHostEl = document.getElementById('toast-host');
+      const input = document.getElementById('input');
+      const sendBtn = document.getElementById('send-btn');
+      const loading = document.getElementById('loading');
+
+      let threads = [];
+      let activeThreadId = null;
+      let menuThreadId = null;
+      let lastUndo = null;
+      let searchQuery = '';
+
+      const nowTs = () => Date.now();
+      const sidFactory = () => 't_' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+
+      const escapeHtml = (s) => String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+      const safeParseJSON = (text) => {
+        try { return JSON.parse(text); } catch { return null; }
+      };
+
+      const relativeTime = (ts) => {
+        if (!ts) return '';
+        const diff = Date.now() - ts;
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return '剛剛';
+        if (mins < 60) return `${mins} 分鐘前`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs} 小時前`;
+        const days = Math.floor(hrs / 24);
+        return `${days} 天前`;
+      };
+
+      const computePreview = (thread) => {
+        if (!thread || !Array.isArray(thread.messages) || !thread.messages.length) return '';
+        const last = thread.messages[thread.messages.length - 1];
+        const t = String(last.text || '').replace(/\s+/g, ' ').trim();
+        return t.length > 26 ? (t.slice(0, 26) + '…') : t;
+      };
+
+      const normalizeThread = (t) => {
+        if (!t || typeof t !== 'object') return null;
+        t.id = t.id || sidFactory();
+        t.title = t.title || '新對話';
+        t.createdAt = typeof t.createdAt === 'number' ? t.createdAt : nowTs();
+        t.lastUpdatedAt = typeof t.lastUpdatedAt === 'number' ? t.lastUpdatedAt : t.createdAt;
+        t.pinned = Boolean(t.pinned);
+        t.flags = t.flags && typeof t.flags === 'object' ? t.flags : {};
+        t.sessionId = t.sessionId || sidFactory();
+        t.messages = Array.isArray(t.messages) ? t.messages : [];
+        return t;
+      };
+
+      const saveState = () => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(threads));
+          if (activeThreadId) localStorage.setItem(ACTIVE_KEY, activeThreadId);
+        } catch (e) {
+          console.warn('saveState failed', e);
+        }
+      };
+
+      const loadState = () => {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const loaded = raw ? safeParseJSON(raw) : null;
+        threads = Array.isArray(loaded) ? loaded.map(normalizeThread).filter(Boolean) : [];
+        const aid = localStorage.getItem(ACTIVE_KEY);
+        activeThreadId = aid || (threads[0] && threads[0].id) || null;
+      };
+
+      const getActiveThread = () => threads.find(t => t.id === activeThreadId) || null;
+
+      const computeTitleFromFirstUserMessage = (thread) => {
+        const firstUser = (thread.messages || []).find(m => m && m.role === 'user' && m.text);
+        if (!firstUser) return '新對話';
+        const t = String(firstUser.text).trim().replace(/\s+/g, ' ');
+        return t.length > 14 ? (t.slice(0, 14) + '…') : t;
+      };
+
+      const showToast = ({ message, actionText, onAction, timeoutMs = 5000 } = {}) => {
+        if (!toastHostEl) return;
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = `
+          <div class="toast-msg">${escapeHtml(message || '')}</div>
+          ${actionText ? `<button type="button" class="toast-action">${escapeHtml(actionText)}</button>` : ''}
+          <button type="button" class="toast-close" aria-label="關閉">×</button>
+        `;
+        toastHostEl.appendChild(toast);
+
+        const close = () => { if (toast && toast.parentNode) toast.parentNode.removeChild(toast); };
+
+        const btn = toast.querySelector('.toast-action');
+        if (btn) btn.addEventListener('click', () => { try { onAction && onAction(); } finally { close(); } });
+        const x = toast.querySelector('.toast-close');
+        if (x) x.addEventListener('click', close);
+        window.setTimeout(close, timeoutMs);
+      };
+
+      const closeThreadMenu = () => {
+        if (!chatMenuEl) return;
+        chatMenuEl.classList.add('hidden');
+        menuThreadId = null;
+      };
+
+      const openThreadMenu = ({ threadId, anchorEl, point } = {}) => {
+        if (!chatMenuEl) return;
+        menuThreadId = threadId;
+        chatMenuEl.classList.remove('hidden');
+
+        const rect = anchorEl ? anchorEl.getBoundingClientRect() : null;
+        const x = point ? point.x : (rect ? (rect.left + 6) : 0);
+        const y = point ? point.y : (rect ? (rect.bottom + 6) : 0);
+
+        const pad = 8;
+        const menuRect = chatMenuEl.getBoundingClientRect();
+        let left = x;
+        let top = y;
+        if (left + menuRect.width + pad > window.innerWidth) left = window.innerWidth - menuRect.width - pad;
+        if (top + menuRect.height + pad > window.innerHeight) top = window.innerHeight - menuRect.height - pad;
+        chatMenuEl.style.left = `${Math.max(pad, left)}px`;
+        chatMenuEl.style.top = `${Math.max(pad, top)}px`;
+      };
+
+      const renderChatList = () => {
+        if (!chatListEl) return;
+        const q = String(searchQuery || '').trim().toLowerCase();
+        let list = threads.slice();
+
+        if (q) {
+          list = list.filter(t => {
+            const title = String(t.title || '').toLowerCase();
+            const preview = computePreview(t).toLowerCase();
+            return title.includes(q) || preview.includes(q);
+          });
+        }
+
+        if (!list.length) {
+          chatListEl.innerHTML = `<div class="chat-list-empty">沒有對話</div>`;
+          return;
+        }
+
+        chatListEl.innerHTML = list
+          .sort((a, b) => {
+            if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+            return (b.lastUpdatedAt || b.createdAt || 0) - (a.lastUpdatedAt || a.createdAt || 0);
+          })
+          .map(t => {
+            const title = t.title || '新對話';
+            const preview = computePreview(t);
+            const timeText = relativeTime(t.lastUpdatedAt || t.createdAt);
+            const active = t.id === activeThreadId;
+            const pinIcon = t.pinned ? '[Pin]' : '';
+            const clearedIcon = t.flags && t.flags.cleared ? '[Cleared]' : '';
+            const errorIcon = t.flags && t.flags.error ? '[Error]' : '';
+            const icons = [pinIcon, clearedIcon, errorIcon].filter(Boolean).join(' ');
+
+            return `
+              <div class="chat-list-row ${active ? 'active' : ''}" data-thread-id="${t.id}">
+                <button class="chat-list-item" type="button" data-thread-id="${t.id}" title="切換對話">
+                  <div class="chat-list-top">
+                    <span class="chat-list-title">${escapeHtml(title)}</span>
+                    <span class="chat-list-time">${escapeHtml(timeText)}</span>
+                  </div>
+                  <div class="chat-list-preview">
+                    ${icons ? `<span class="chat-list-icons">${escapeHtml(icons)}</span>` : ''}
+                    <span class="chat-list-preview-text">${escapeHtml(preview || ' ')} </span>
+                  </div>
+                </button>
+                <button class="chat-list-more" type="button" aria-label="更多" title="更多" data-thread-more="${t.id}">⋯</button>
+              </div>`;
+          })
+          .join('');
+
+        chatListEl.querySelectorAll('[data-thread-id]').forEach(btn => {
+          if (!(btn instanceof HTMLButtonElement)) return;
+          if (btn.hasAttribute('data-thread-more')) return;
+          btn.addEventListener('click', () => {
+            const tid = btn.getAttribute('data-thread-id');
+            if (!tid) return;
+            switchThread(tid);
+          });
+        });
+
+        chatListEl.querySelectorAll('[data-thread-more]').forEach(moreBtn => {
+          moreBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const tid = moreBtn.getAttribute('data-thread-more');
+            if (!tid) return;
+            openThreadMenu({ threadId: tid, anchorEl: moreBtn });
+          });
+        });
+
+        chatListEl.querySelectorAll('.chat-list-row').forEach(row => {
+          row.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const tid = row.getAttribute('data-thread-id');
+            if (!tid) return;
+            openThreadMenu({ threadId: tid, point: { x: e.clientX, y: e.clientY } });
+          });
+        });
+      };
+
+      const exportJSON = (obj, filename) => {
+        const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      const exportAllThreads = () => {
+        exportJSON({ version: 1, exportedAt: nowTs(), threads }, `點餐助手-對話匯出-${nowTs()}.json`);
+        showToast({ message: '已匯出全部對話' });
+      };
+
+      const exportOneThread = (threadId) => {
+        const t = threads.find(x => x.id === threadId);
+        if (!t) return;
+        exportJSON({ version: 1, exportedAt: nowTs(), thread: t }, `點餐助手-對話-${t.title || '新對話'}.json`);
+        showToast({ message: '已匯出此對話' });
+      };
+
+      const importThreadsFromJSON = (data) => {
+        if (!data) throw new Error('JSON 格式錯誤');
+        const importedThreads = [];
+        if (Array.isArray(data.threads)) importedThreads.push(...data.threads);
+        if (data.thread) importedThreads.push(data.thread);
+        if (!importedThreads.length) throw new Error('找不到 threads/thread 欄位');
+
+        const normalized = importedThreads.map(normalizeThread).filter(Boolean);
+        const existingIds = new Set(threads.map(t => t.id));
+        for (const t of normalized) {
+          if (existingIds.has(t.id)) t.id = sidFactory();
+          threads.push(t);
+        }
+        if (!activeThreadId && threads[0]) activeThreadId = threads[0].id;
+        saveState();
+        renderChatList();
+        showToast({ message: `已匯入 ${normalized.length} 個對話` });
+      };
+
+      const deleteThread = (threadId) => {
+        const idx = threads.findIndex(x => x.id === threadId);
+        if (idx < 0) return;
+        const removed = threads[idx];
+        threads.splice(idx, 1);
+        lastUndo = { type: 'delete', payload: removed, expiresAt: nowTs() + 10000 };
+
+        if (activeThreadId === threadId) {
+          activeThreadId = (threads[0] && threads[0].id) || null;
+          if (!activeThreadId) createThread({ autoSwitch: true });
+          redrawConversation({ keepScrollIfReading: false });
+        }
+        saveState();
+        renderChatList();
+
+        showToast({
+          message: `已刪除「${removed.title || '新對話'}」`,
+          actionText: '復原',
+          onAction: () => {
+            if (!lastUndo || lastUndo.type !== 'delete') return;
+            if (nowTs() > lastUndo.expiresAt) return;
+            threads.push(normalizeThread(lastUndo.payload));
+            saveState();
+            renderChatList();
+          },
+          timeoutMs: 9000,
+        });
+      };
+
+      const togglePin = (threadId) => {
+        const t = threads.find(x => x.id === threadId);
+        if (!t) return;
+        t.pinned = !t.pinned;
+        t.lastUpdatedAt = nowTs();
+        saveState();
+        renderChatList();
+        showToast({ message: t.pinned ? '已釘選' : '已取消釘選' });
+      };
+
+      const switchThread = (threadId) => {
+        const t = threads.find(x => x.id === threadId);
+        if (!t) return;
+        activeThreadId = threadId;
+        redrawConversation();
+        renderChatList();
+        saveState();
+        input && input.focus();
+      };
+
+      const createThread = ({ autoSwitch = true } = {}) => {
+        const t = {
+          id: sidFactory(),
+          title: '新對話',
+          createdAt: Date.now(),
+          lastUpdatedAt: Date.now(),
+          pinned: false,
+          flags: {},
+          sessionId: sidFactory(),
+          messages: []
+        };
+        threads.push(t);
+        if (autoSwitch) activeThreadId = t.id;
+        saveState();
+        renderChatList();
+        return t;
+      };
+
+      const formatText = (text) => {
+        if (!text) return '';
+        let html = String(text).replace(/\n/g, '<br>');
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        return html;
+      };
+
+      const isNearBottom = () => {
+        const thresholdPx = 24;
+        const distance = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight;
+        return distance <= thresholdPx;
+      };
+
+      const scrollToBottom = () => { chatBox.scrollTop = chatBox.scrollHeight; };
+
+      const appendMessage = (role, text, { persist = true } = {}) => {
+        const shouldAutoScroll = isNearBottom();
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${role}`;
+        msgDiv.innerHTML = role === 'bot'
+          ? `<div class="avatar">AI</div><div class="bubble">${formatText(text)}</div>`
+          : `<div class="bubble">${formatText(text)}</div>`;
+        chatBox.appendChild(msgDiv);
+        // 總是自動滾動到最新訊息
+        setTimeout(() => scrollToBottom(), 50);
+
+        if (persist) {
+          const t = getActiveThread() || createThread({ autoSwitch: true });
+          t.messages = Array.isArray(t.messages) ? t.messages : [];
+          t.messages.push({ role, text });
+          t.lastUpdatedAt = nowTs();
+          if (role === 'user' && (!t.title || t.title === '新對話')) {
+            t.title = computeTitleFromFirstUserMessage(t);
+          }
+          saveState();
+          renderChatList();
+        }
+      };
+
+      const showLoading = (show) => {
+        if (!loading) return;
+        if (show) {
+          loading.classList.remove('hidden');
+          chatBox.appendChild(loading);
+          if (isNearBottom()) scrollToBottom();
+        } else {
+          loading.classList.add('hidden');
+        }
+      };
+
+      const redrawConversation = ({ keepScrollIfReading = true } = {}) => {
+        if (!chatBox) return;
+        const shouldAutoScroll = keepScrollIfReading ? isNearBottom() : true;
+
+        const t = getActiveThread();
+        const hasMessages = Boolean(t && Array.isArray(t.messages) && t.messages.length);
+
+        // 始終顯示對話框，不隱藏
+        chatBox.classList.remove('hidden');
+
+        if (!hasMessages) {
+          // 沒有訊息時顯示歡迎訊息
+          chatBox.innerHTML = '';
+          return;
+        }
+
+        chatBox.innerHTML = '';
+        for (const m of (t.messages || [])) {
+          if (!m || !m.role) continue;
+          appendMessage(m.role, m.text, { persist: false });
+        }
+
+        if (shouldAutoScroll) scrollToBottom();
+      };
+
+      const ensureBasics = () => {
+        if (!chatBox || !input || !sendBtn) {
+          alert('前端元素不存在或載入錯誤，請重新整理。');
+          return false;
+        }
+        return true;
+      };
+
+      const send = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+
+        // 檢查是否是選擇餐廳（輸入數字 1-10）
+        if (window.lastCrawledRestaurants && /^([1-9]|10)$/.test(text.trim())) {
+          const idx = parseInt(text.trim()) - 1;
+          if (idx >= 0 && idx < window.lastCrawledRestaurants.length) {
+            const restaurant = window.lastCrawledRestaurants[idx];
+            input.value = '';
+            appendMessage('user', text);
+            await crawlFoodpandaMenu(restaurant);
+            return;
+          }
+        }
+
+        if (!getActiveThread()) {
+          createThread({ autoSwitch: true });
+          redrawConversation({ keepScrollIfReading: false });
+        }
+
+        input.value = '';
+        appendMessage('user', text);
+
+        showLoading(true);
+        input.disabled = true;
+
+        const t = getActiveThread();
+        const sessionId = (t && t.sessionId) ? t.sessionId : sidFactory();
+
+        try {
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId, text })
+          });
+          const data = await res.json();
+          showLoading(false);
+          appendMessage('bot', data.reply || '[發生錯誤] 回覆內容為空');
+        } catch (e) {
+          showLoading(false);
+          const t = getActiveThread();
+          if (t) {
+            t.flags = t.flags && typeof t.flags === 'object' ? t.flags : {};
+            t.flags.error = true;
+            t.lastUpdatedAt = nowTs();
+            saveState();
+            renderChatList();
+          }
+          appendMessage('bot', `[發生錯誤] 無法連線：${e}`);
+        } finally {
+          input.disabled = false;
+          input.focus();
+        }
+      };
+
+      const clearActiveChat = ({ notice = '' } = {}) => {
+        showLoading(false);
+        const t = getActiveThread();
+        if (t) {
+          t.messages = [];
+          t.title = '新對話';
+          t.sessionId = sidFactory();
+          t.lastUpdatedAt = nowTs();
+          t.flags = t.flags && typeof t.flags === 'object' ? t.flags : {};
+          t.flags.cleared = true;
+          saveState();
+          renderChatList();
+        }
+
+        chatBox.innerHTML = '';
+        if (notice) appendMessage('bot', notice);
+        input.value = '';
+        input.disabled = false;
+      };
+
+      const newChat = ({ notice = '已建立新對話' } = {}) => {
+        showLoading(false);
+        createThread({ autoSwitch: true });
+        chatBox.innerHTML = '';
+        if (notice) appendMessage('bot', notice);
+        input.value = '';
+        input.disabled = false;
+        input.focus();
+      };
+
+      const showCrawlDialog = async () => {
+        const query = prompt('請輸入餐廳名稱\n例如：「日南拉雅」、「麥當勞大甲經國」、「鼎泰豐」', '');
+        if (!query || !query.trim()) return;
+
+        showToast({ message: '正在從 Google 搜尋菜單...', timeoutMs: 10000 });
+        showLoading(true);
+        input.disabled = true;
+
+        try {
+          const res = await fetch('/api/search-foodpanda', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: query.trim(),
+              city: 'taichung',
+              maxResults: 1
+            })
+          });
+          const data = await res.json();
+
+          if (data.success && data.restaurants && data.restaurants.length > 0) {
+            // 儲存餐廳清單
+            window.lastCrawledRestaurants = data.restaurants;
+
+            const restaurant = data.restaurants[0];
+
+            // 讓用戶可以編輯餐廳名稱
+            const confirmedName = prompt(
+              `找到餐廳：${restaurant.name}\n\n確認餐廳名稱正確嗎？\n如果不對，請修改（例如：將「大田」改為「大甲」）`,
+              restaurant.name
+            );
+
+            if (!confirmedName || !confirmedName.trim()) {
+              appendMessage('bot', '已取消爬取');
+              showLoading(false);
+              input.disabled = false;
+              input.focus();
+              return;
+            }
+
+            // 使用用戶確認的名稱
+            restaurant.name = confirmedName.trim();
+
+            appendMessage('bot', `確認餐廳：${restaurant.name}\n\n正在從 Google 知識面板爬取完整菜單...\n這可能需要 10-30 秒\n瀏覽器視窗會短暫顯示（避免 Google CAPTCHA）\n\n請稍候...`);
+
+            // 直接開始爬取菜單
+            await crawlFoodpandaMenu(restaurant);
+          } else {
+            appendMessage('bot', `${data.message || '搜尋失敗'}\n\n建議：\n1. 確認餐廳名稱正確\n2. 試試更完整的名稱（例如：「麥當勞大甲經國」）\n3. 包含地區資訊（例如：「大甲」而非「大田」）`);
+            showToast({ message: '搜尋失敗，請查看對話訊息' });
+          }
+        } catch (e) {
+          appendMessage('bot', `連線錯誤：${e}\n\n可能是後端服務未啟動。`);
+        } finally {
+          showLoading(false);
+          input.disabled = false;
+          input.focus();
+        }
+      };
+
+      const crawlFoodpandaMenu = async (restaurant) => {
+        showToast({ message: `正在從 Google 爬取「${restaurant.name}」的菜單...`, timeoutMs: 60000 });
+        showLoading(true);
+        input.disabled = true;
+
+        try {
+          const res = await fetch('/api/crawl-foodpanda', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              vendorCode: restaurant.vendorCode,
+              restaurantName: restaurant.name
+            })
+          });
+          const data = await res.json();
+
+          if (data.success && data.menuItems) {
+            window.lastCrawledRestaurants = null;
+
+            const restaurantInfo = data.restaurant;
+            const itemCount = data.menuItems.length;
+
+            const menuPreview = data.menuItems.slice(0, 20)
+              .map((item, idx) => `${idx + 1}. ${item.dish} - ${item.price || '價格未知'}`)
+              .join('\n');
+
+            let message = `${data.message}\n\n`;
+            message += `餐廳：${restaurantInfo.name}\n`;
+            message += `\n菜單（前 20 道）：\n${menuPreview}`;
+
+            if (itemCount > 20) {
+              message += `\n\n...還有 ${itemCount - 20} 道菜`;
+            }
+
+            message += '\n\n菜單資料已儲存，你可以開始詢問推薦或直接點餐！';
+
+            appendMessage('bot', message);
+            showToast({ message: `成功爬取 ${itemCount} 道菜品！` });
+          } else {
+            appendMessage('bot', `${data.message}\n\n提示：\n1. 確認餐廳名稱正確\n2. 確認 Google 上有此餐廳的菜單資料\n3. 試試搜尋「餐廳名稱 + 分店」（例如：「日南拉雅」）`);
+            showToast({ message: '爬取失敗，請查看對話訊息' });
+          }
+        } catch (e) {
+          appendMessage('bot', `連線錯誤：${e}\n\n請確認後端服務正常運作。`);
+        } finally {
+          showLoading(false);
+          input.disabled = false;
+          input.focus();
+        }
+      };
+
+      const handleHelp = () => {
+        appendMessage('bot', '你可以直接輸入想點的餐點：例如「雞排飯 1 份、紅茶 2 杯」。我會幫你整理與確認。\n\n小技巧：點擊上方「爬菜單」可以從 Google Maps 搜尋餐廳資訊（但不是所有餐廳都有線上菜單資料）。');
+      };
+
+      const showRename = (threadId) => {
+        const t = threads.find(x => x.id === threadId);
+        if (!t) return;
+        const name = prompt('重新命名對話', t.title || '新對話');
+        if (name === null) return;
+        t.title = (name || '新對話').trim();
+        t.lastUpdatedAt = nowTs();
+        saveState();
+        renderChatList();
+      };
+
+      if (!ensureBasics()) return;
+
+      loadState();
+      if (!threads.length) createThread({ autoSwitch: true });
+      if (!getActiveThread() && threads[0]) activeThreadId = threads[0].id;
+      renderChatList();
+      redrawConversation({ keepScrollIfReading: false });
+
+      sendBtn?.addEventListener('click', send);
+      input?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          send();
+        }
+      });
+
+      chatSearchEl?.addEventListener('input', () => {
+        searchQuery = chatSearchEl.value || '';
+        renderChatList();
+      });
+
+      exportAllBtn?.addEventListener('click', exportAllThreads);
+      if (importJsonBtn && importFileEl) {
+        importJsonBtn.addEventListener('click', () => importFileEl.click());
+        importFileEl.addEventListener('change', async () => {
+          const f = importFileEl.files && importFileEl.files[0];
+          if (!f) return;
+          try {
+            const text = await f.text();
+            const data = safeParseJSON(text);
+            importThreadsFromJSON(data);
+          } catch (e) {
+            showToast({ message: `匯入失敗：${e}` });
+          } finally {
+            importFileEl.value = '';
+          }
+        });
+      }
+
+      chatMenuEl?.querySelectorAll('[data-action]')?.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const action = btn.getAttribute('data-action');
+          const tid = menuThreadId;
+          closeThreadMenu();
+          if (!tid) return;
+          if (action === 'rename') return showRename(tid);
+          if (action === 'pin') return togglePin(tid);
+          if (action === 'export') return exportOneThread(tid);
+          if (action === 'delete') return deleteThread(tid);
+        });
+      });
+
+      window.addEventListener('click', (e) => {
+        if (!chatMenuEl || chatMenuEl.classList.contains('hidden')) return;
+        if (e.target === chatMenuEl || chatMenuEl.contains(e.target)) return;
+        closeThreadMenu();
+      });
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeThreadMenu(); });
+      window.addEventListener('resize', closeThreadMenu);
+      window.addEventListener('scroll', () => closeThreadMenu(), true);
+      chatListEl?.addEventListener('scroll', () => closeThreadMenu(), { passive: true });
+
+      newChatBtn?.addEventListener('click', () => newChat({ notice: '已建立新對話' }));
+      crawlBtn?.addEventListener('click', showCrawlDialog);
+      clearBtn?.addEventListener('click', () => clearActiveChat({ notice: '已清空，目前是新對話。' }));
+      helpBtn?.addEventListener('click', handleHelp);
+
+      // 餐廳管理功能
+      const restaurantSelect = document.getElementById('restaurant-select');
+      const restaurantSelectMobile = document.getElementById('restaurant-select-mobile');
+      const restaurantInfo = document.getElementById('restaurant-info');
+
+      async function loadRestaurants() {
+        try {
+          const response = await fetch('/api/restaurants');
+          const data = await response.json();
+
+          // 清空兩個選擇器
+          restaurantSelect.innerHTML = '';
+          if (restaurantSelectMobile) {
+            restaurantSelectMobile.innerHTML = '';
+          }
+
+          if (!data.restaurants || data.restaurants.length === 0) {
+            restaurantSelect.innerHTML = '<option>無可用餐廳</option>';
+            if (restaurantSelectMobile) {
+              restaurantSelectMobile.innerHTML = '<option>無餐廳</option>';
+            }
+            restaurantInfo.textContent = '尚未爬取任何餐廳菜單';
+            restaurantInfo.style.background = '#fef2f2';
+            restaurantInfo.style.color = '#991b1b';
+            return;
+          }
+
+          // 填充兩個選擇器
+          data.restaurants.forEach(r => {
+            // 側邊欄選擇器（電腦版）
+            const opt = document.createElement('option');
+            opt.value = r.name;
+            opt.textContent = `${r.name} (${r.itemCount}項)`;
+            if (r.active) opt.selected = true;
+            restaurantSelect.appendChild(opt);
+
+            // 手機版選擇器
+            if (restaurantSelectMobile) {
+              const optMobile = document.createElement('option');
+              optMobile.value = r.name;
+              optMobile.textContent = r.name;
+              if (r.active) optMobile.selected = true;
+              restaurantSelectMobile.appendChild(optMobile);
+            }
+          });
+
+          // 更新資訊顯示
+          const active = data.restaurants.find(r => r.active);
+          if (active) {
+            restaurantInfo.textContent = `當前使用 ${active.name} 的菜單 (共 ${active.itemCount} 項菜品)`;
+            restaurantInfo.style.background = '#f0fdf4';
+            restaurantInfo.style.color = '#166534';
+          }
+
+          console.log('已載入餐廳列表:', data.restaurants.length);
+        } catch (err) {
+          console.error('載入餐廳列表失敗:', err);
+          restaurantSelect.innerHTML = '<option>載入失敗</option>';
+          if (restaurantSelectMobile) {
+            restaurantSelectMobile.innerHTML = '<option>載入失敗</option>';
+          }
+          restaurantInfo.textContent = '無法連接到後端服務';
+          restaurantInfo.style.background = '#fef2f2';
+          restaurantInfo.style.color = '#991b1b';
+        }
+      }
+
+      async function switchRestaurant(name) {
+        try {
+          const response = await fetch(`/api/switch-restaurant?restaurant_name=${encodeURIComponent(name)}`, {
+            method: 'POST'
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            showToast(`${data.message}`, 2000);
+            loadRestaurants(); // 重新載入更新資訊
+          } else {
+            showToast(`切換失敗: ${data.message}`, 3000);
+          }
+        } catch (err) {
+          console.error('切換餐廳失敗:', err);
+          showToast('切換餐廳時發生錯誤', 3000);
+        }
+      }
+
+      // 電腦版選擇器事件
+      restaurantSelect?.addEventListener('change', (e) => {
+        const selectedName = e.target.value;
+        if (selectedName && selectedName !== '載入中...' && selectedName !== '無可用餐廳') {
+          switchRestaurant(selectedName);
+        }
+      });
+
+      // 手機版選擇器事件
+      restaurantSelectMobile?.addEventListener('change', (e) => {
+        const selectedName = e.target.value;
+        if (selectedName && selectedName !== '載入中...' && selectedName !== '無餐廳') {
+          switchRestaurant(selectedName);
+        }
+      });
+
+      // 刪除餐廳功能
+      const deleteRestaurantBtn = document.getElementById('delete-restaurant-btn');
+
+      async function deleteRestaurant(name) {
+        if (!confirm(`確定要刪除「${name}」的菜單嗎？\n\n此操作將會：\n1. 從系統中移除此餐廳\n2. 刪除對應的 JSON 檔案\n\n此操作無法復原！`)) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/menu/${encodeURIComponent(name)}`, {
+            method: 'DELETE'
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: '未知錯誤' }));
+            throw new Error(errorData.message || errorData.detail || '刪除失敗');
+          }
+
+          const data = await response.json();
+
+          if (data.success) {
+            showToast({ message: `已刪除「${name}」`, timeoutMs: 3000 });
+            // 重新載入餐廳列表
+            await loadRestaurants();
+          } else {
+            showToast({ message: `刪除失敗: ${data.message}`, timeoutMs: 3000 });
+          }
+        } catch (err) {
+          console.error('刪除餐廳失敗:', err);
+          showToast({ message: `刪除時發生錯誤: ${err.message}`, timeoutMs: 3000 });
+        }
+      }
+
+      // 刪除按鈕事件
+      deleteRestaurantBtn?.addEventListener('click', () => {
+        const selectedName = restaurantSelect?.value;
+        if (selectedName && selectedName !== '載入中...' && selectedName !== '無可用餐廳' && selectedName !== '載入失敗') {
+          deleteRestaurant(selectedName);
+        } else {
+          showToast({ message: '請先選擇一個餐廳', timeoutMs: 2000 });
+        }
+      });
+
+      // 深色模式切換
+      const htmlElement = document.documentElement;
+
+      // 從 localStorage 讀取主題設定
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      htmlElement.setAttribute('data-theme', savedTheme);
+      if (themeIcon) {
+        themeIcon.textContent = savedTheme === 'dark' ? '淺色模式' : '深色模式';
+      }
+
+      themeToggleBtn?.addEventListener('click', () => {
+        const currentTheme = htmlElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+        htmlElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        if (themeIcon) {
+          themeIcon.textContent = newTheme === 'dark' ? '淺色模式' : '深色模式';
+        }
+
+        showToast({
+          message: newTheme === 'dark' ? '已切換至深色模式' : '已切換至淺色模式',
+          duration: 1500
+        });
+      });
+
+      // 頁面載入時執行
+      loadRestaurants();
+
+      // ============================================
+      // 查看完整菜單功能
+      // ============================================
+      const viewMenuBtn = document.getElementById('view-menu-btn');
+      const menuModal = document.getElementById('menu-modal');
+      const menuModalClose = document.getElementById('menu-modal-close');
+      const menuModalOverlay = menuModal?.querySelector('.menu-modal-overlay');
+      const menuModalBody = document.getElementById('menu-modal-body');
+      const menuModalTitle = document.getElementById('menu-modal-title');
+
+      // 打開 Modal
+      async function openMenuModal() {
+        if (!menuModal || !menuModalBody) return;
+
+        menuModal.classList.remove('hidden');
+        menuModalBody.innerHTML = '<div class="menu-loading">載入中...</div>';
+
+        try {
+          const response = await fetch('/api/current-menu');
+          const data = await response.json();
+
+          if (!data.success) {
+            menuModalBody.innerHTML = `<div class="menu-error">${escapeHtml(data.message || '載入失敗')}</div>`;
+            return;
+          }
+
+          // 更新標題
+          if (menuModalTitle && data.restaurantName) {
+            menuModalTitle.textContent = `${data.restaurantName} - 完整菜單`;
+          }
+
+          // 渲染菜單
+          if (!data.categories || data.categories.length === 0) {
+            menuModalBody.innerHTML = '<div class="menu-empty">目前沒有菜單資料</div>';
+            return;
+          }
+
+          let html = '';
+          for (const category of data.categories) {
+            const items = category.items || [];
+            if (items.length === 0) continue;
+
+            html += `
+              <div class="menu-category">
+                <h3 class="menu-category-title">${escapeHtml(category.name)}</h3>
+                <div class="menu-items">
+            `;
+
+            for (const item of items) {
+              const name = escapeHtml(item.name || '未命名');
+              const price = item.price ? `$${item.price}` : '時價';
+              html += `
+                <div class="menu-item">
+                  <span class="menu-item-name">${name}</span>
+                  <span class="menu-item-price">${escapeHtml(price)}</span>
+                </div>
+              `;
+            }
+
+            html += `
+                </div>
+              </div>
+            `;
+          }
+
+          menuModalBody.innerHTML = html;
+
+        } catch (error) {
+          console.error('載入菜單失敗:', error);
+          menuModalBody.innerHTML = '<div class="menu-error">載入菜單時發生錯誤，請稍後再試</div>';
+        }
+      }
+
+      // 關閉 Modal
+      function closeMenuModal() {
+        if (!menuModal) return;
+        menuModal.classList.add('hidden');
+      }
+
+      // 事件監聽
+      viewMenuBtn?.addEventListener('click', openMenuModal);
+      menuModalClose?.addEventListener('click', closeMenuModal);
+
+      // 點擊遮罩層關閉
+      menuModalOverlay?.addEventListener('click', closeMenuModal);
+
+      // ESC 鍵關閉
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && menuModal && !menuModal.classList.contains('hidden')) {
+          closeMenuModal();
+        }
+      });
+
+      console.info('[點餐助手] UI ready');
+    })();
+  </script>
+</body>
+
+</html>

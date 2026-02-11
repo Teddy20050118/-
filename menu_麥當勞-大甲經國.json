@@ -1,0 +1,281 @@
+{
+  "name": "麥當勞-大甲經國",
+  "menu_items": [
+    {
+      "name": "套餐-麥克鷄塊(6塊) Chicken McNuggets (6pcs) Meal",
+      "price": "$151.00"
+    },
+    {
+      "name": "套餐-豬肉滿福堡 Sausage McMuffin Meal",
+      "price": "$106.00"
+    },
+    {
+      "name": "套餐-帕瑪森安格斯牛肉堡 Parmesan Angus Beef Meal",
+      "price": "$218.00"
+    },
+    {
+      "name": "套餐-豬肉蛋堡 Egg Burger With Sausage Meal",
+      "price": "$120.00"
+    },
+    {
+      "name": "套餐-帕瑪森主廚鷄腿堡 Parmesan Crispy Chicken Burger Meal",
+      "price": "$218.00"
+    },
+    {
+      "name": "套餐-滿福堡 Egg McMuffin Meal",
+      "price": "$108.00"
+    },
+    {
+      "name": "套餐-麥克鷄塊(10塊) Chicken McNuggets (10pcs) Meal",
+      "price": "$192.00"
+    },
+    {
+      "name": "套餐-大麥克 Big Mac Meal",
+      "price": "$169.00"
+    },
+    {
+      "name": "套餐-麥香魚 Filet-O-Fish Meal",
+      "price": "$114.00"
+    },
+    {
+      "name": "套餐-四盎司牛肉堡 Classic Angus Beef Burger Meal",
+      "price": "$183.00"
+    },
+    {
+      "name": "套餐-雙層四盎司牛肉堡 Double Classic Angus Beef Burger Meal",
+      "price": "$223.00"
+    },
+    {
+      "name": "套餐-豬肉滿福堡加蛋 Sausage McMuffin With Egg Meal",
+      "price": "$116.00"
+    },
+    {
+      "name": "套餐-番茄嫩蛋焙果堡 Tomato Bagel Sandwich Meal",
+      "price": "$127.00"
+    },
+    {
+      "name": "套餐-雙層牛肉吉事堡 Double Cheeseburger Meal",
+      "price": "$163.00"
+    },
+    {
+      "name": "套餐-雙層麥香鷄 Double McChicken Meal",
+      "price": "$140.00"
+    },
+    {
+      "name": "套餐-蕈菇嫩蛋焙果堡 Mushroom Bagel Sandwich",
+      "price": "$147.00"
+    },
+    {
+      "name": "套餐-無敵豬肉滿福堡加蛋 Mega Sausage McMuffin With Egg Meal",
+      "price": "$136.00"
+    },
+    {
+      "name": "套餐-火腿蛋堡 Egg Burger W/ Canadian Bacon Meal",
+      "price": "$108.00"
+    },
+    {
+      "name": "套餐-蕈菇主廚鷄腿堡 Mushroom Crispy Chicken Burger Meal",
+      "price": "$223.00"
+    },
+    {
+      "name": "套餐-麥香鷄 McChicken Meal",
+      "price": "$139.00"
+    },
+    {
+      "name": "套餐-鷄塊鬆餅餐 Grand Breakfast Meal",
+      "price": "$172.00"
+    },
+    {
+      "name": "套餐-勁辣鷄腿堡 Spicy Chicken Filet Burger Meal",
+      "price": "$169.00"
+    },
+    {
+      "name": "套餐-豬肉鬆餅 Hotcakes With Sausage Meal",
+      "price": "$127.00"
+    },
+    {
+      "name": "套餐-蕈菇安格斯牛肉堡 Mushroom Angus Beef Burger Meal",
+      "price": "$223.00"
+    },
+    {
+      "name": "麥克鷄塊 (6塊) Chicken McNuggets (6pcs)",
+      "price": "$70.00"
+    },
+    {
+      "name": "麥克鷄塊 (10塊) Chicken McNuggets (10pcs)",
+      "price": "$111.00"
+    },
+    {
+      "name": "麥克鷄塊 (4塊) Chicken McNuggets (4pcs)",
+      "price": "$50.00"
+    },
+    {
+      "name": "薯餅 Hash Brown",
+      "price": "$37.00"
+    },
+    {
+      "name": "蘋果派 Apple Pie",
+      "price": "$42.00"
+    },
+    {
+      "name": "經典美式咖啡(冰) Americano(Iced)",
+      "price": "$66.00"
+    },
+    {
+      "name": "熱蜂蜜奶茶 Hot Honey Milk Tea",
+      "price": "$70.00"
+    },
+    {
+      "name": "紅茶(熱) Tea(Hot)",
+      "price": "$38.00"
+    },
+    {
+      "name": "Evian 礦泉水 Evian Water",
+      "price": "$52.00"
+    },
+    {
+      "name": "金選美式咖啡(熱) Select Blend Americano(Hot)",
+      "price": "$76.00"
+    },
+    {
+      "name": "金選那堤(冰) Select Blend Latte(Iced)",
+      "price": "$89.00"
+    },
+    {
+      "name": "玉米湯 (大) Corn Soup (L)",
+      "price": "$57.00"
+    },
+    {
+      "name": "無糖紅茶(冰) (中) Sugar-Free Black Tea(Iced) (M)",
+      "price": "$45.00"
+    },
+    {
+      "name": "冰蜂蜜奶茶 Iced Honey Milk Tea",
+      "price": "$70.00"
+    },
+    {
+      "name": "經典那堤(熱) Latte(Hot)",
+      "price": "$79.00"
+    },
+    {
+      "name": "檸檬風味紅茶(冰) (中) Lemon Flavored Black Tea(Iced) (M)",
+      "price": "$38.00"
+    },
+    {
+      "name": "無糖綠茶(冰) (中) Sugar-Free Green Tea(Iced) (M)",
+      "price": "$45.00"
+    },
+    {
+      "name": "金選那堤(熱) Select Blend Latte(Hot)",
+      "price": "$89.00"
+    },
+    {
+      "name": "經典美式咖啡(熱) Americano(Hot)",
+      "price": "$66.00"
+    },
+    {
+      "name": "經典那堤(冰) Latte(Iced)",
+      "price": "$79.00"
+    },
+    {
+      "name": "台灣鮮榨柳丁汁 Taiwan Fresh Orange Juice",
+      "price": "$70.00"
+    },
+    {
+      "name": "金選美式(冰) Select Blend Americano(Iced)",
+      "price": "$76.00"
+    },
+    {
+      "name": "焦糖奶茶(冰) Caramel Milk Tea (Iced)",
+      "price": "$70.00"
+    },
+    {
+      "name": "可口可樂 Zero (中) Coke Zero (M)",
+      "price": "$38.00"
+    },
+    {
+      "name": "可口可樂 (中) Coca Cola (M)",
+      "price": "$38.00"
+    },
+    {
+      "name": "冰蜂蜜紅茶 Iced Honey Black Tea",
+      "price": "$60.00"
+    },
+    {
+      "name": "雪碧 (中) Sprite (M)",
+      "price": "$38.00"
+    },
+    {
+      "name": "漢堡餐 Happy Meal Happy Meal - Hamburger",
+      "price": "$89.00"
+    },
+    {
+      "name": "套餐-蕈菇豬肉滿福堡加蛋 Sausage McMuffin With Egg And Mushroom Combo",
+      "price": "$136.00"
+    },
+    {
+      "name": "派送福氣雙享餐 Sausage McMuffin With Egg Meal (Appie Pie)",
+      "price": "$273.00"
+    },
+    {
+      "name": "套餐-蕈菇豬肉滿福堡 Sausage McMuffin With Mushroom Combo",
+      "price": "$126.00"
+    },
+    {
+      "name": "套餐-蕈菇無敵豬肉滿福堡加蛋 Mega McMuffin With Mushroom Combo",
+      "price": "$156.00"
+    },
+    {
+      "name": "福氣滿滿雙享餐 Sausage McMuffin With Egg Meal (6pcs McNuggets)",
+      "price": "$245.00"
+    },
+    {
+      "name": "菇Luck雙享餐 Sausage McMuffin With Egg & Mushroom Meal (6pcs McNuggets)",
+      "price": "$275.00"
+    },
+    {
+      "name": "派送菇Luck雙享餐 Sausage McMuffin With Egg & Mushroom Meal (Apple Pie)",
+      "price": "$303.00"
+    },
+    {
+      "name": "套餐-蕈菇滿福堡 Egg McMuffin With Mushroom Combo",
+      "price": "$128.00"
+    },
+    {
+      "name": "塑膠袋 Plastic Bag",
+      "price": "$2.00"
+    },
+    {
+      "name": "百分百購物袋 (紅) 100% Bag(Red)",
+      "price": "$49.00"
+    },
+    {
+      "name": "百分百購物袋 (黑) 100% Bag(Black)",
+      "price": "$49.00"
+    },
+    {
+      "name": "20塊麥克鷄塊分享餐 20pcs Chicken McNuggets Happy Sharing Meal",
+      "price": "$285.00"
+    },
+    {
+      "name": "30塊麥克鷄塊分享餐 30pcs Chicken McNuggets Happy Sharing Meal",
+      "price": "$378.00"
+    },
+    {
+      "name": "套餐-金迎招財薯來堡 (鷄) Chicken Prosperity Deluxe Meal",
+      "price": "$200.00"
+    },
+    {
+      "name": "套餐-金迎招財薯來堡 (牛) Beef Prosperity Deluxe Meal",
+      "price": "$200.00"
+    },
+    {
+      "name": "陽光鱈魚堡餐 Happy Meal Happy Meal - McFish",
+      "price": "$89.00"
+    },
+    {
+      "name": "麥克鷄塊餐(4塊) Happy Meal Happy Meal - Chicken McNuggets (4pcs)",
+      "price": "$89.00"
+    }
+  ]
+}

@@ -492,7 +492,7 @@ def format_recommend_text(rec: Dict[str, object]) -> str:
             "reason": enrich_reason(item),
         }
         section_key = classify_section(item)
-        sections.setdefault(section_key, {"title": "🍽️ 其他", "items": []})["items"].append(entry)
+        sections.setdefault(section_key, {"title": "其他", "items": []})["items"].append(entry)
 
     service_fee = round(subtotal * 0.1, 1)
     total = subtotal + service_fee

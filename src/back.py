@@ -7,6 +7,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import asyncio
 
+if sys.platform.startswith('win32'):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+   
 # 確保可以從 src/ 匯入模組
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 if SRC_DIR not in sys.path:
@@ -26,10 +29,10 @@ from main import (
 
 # 匯入爬蟲模組
 try:
-    import quick_manual_crawl
+    import crawl_menu
     CRAWLER_AVAILABLE = True
 except ImportError as e:
-    print(f"[警告] 無法匯入 quick_manual_crawl: {e}")
+    print(f"[警告] 無法匯入 crawl_menu: {e}")
     CRAWLER_AVAILABLE = False
 
 # 專案路徑設定（PROJECT_ROOT 已在上方第16行定義）
@@ -210,7 +213,7 @@ for menu_file in menu_files:
         print(f" 載入 {menu_file} 失敗：{e}")
 
 # 設定預設活動餐廳（最新修改的）
-if RESTAURANT_MENUS:
+if RESTAURANT_MENUS and menu_files:  # 確保 menu_files 不是空列表
     latest_file = max(menu_files, key=os.path.getmtime)
     latest_name = os.path.basename(latest_file).replace("menu_", "").replace(".json", "")
     ACTIVE_RESTAURANT = latest_name
@@ -308,6 +311,47 @@ def health():
 def index():
     return FileResponse(os.path.join(WEB_DIR, "web.html"))
 
+@app.get("/api/current-menu")
+def get_current_menu():
+    """
+    回傳當前活動餐廳的菜單資料
+    """
+    try:
+        if not ACTIVE_RESTAURANT or not menu:
+            return {
+                "success": False,
+                "message": "目前未載入任何菜單",
+                "restaurantName": None,
+                "categories": []
+            }
+        
+        # 獲取當前餐廳的菜單資料
+        restaurant_data = menu.get("restaurants", {}).get(ACTIVE_RESTAURANT, {})
+        categories_dict = restaurant_data.get("categories", {})
+        
+        # 轉換成前端友善的格式（陣列）
+        categories_array = []
+        for category_name, category_data in categories_dict.items():
+            categories_array.append({
+                "name": category_name,
+                "items": category_data.get("items", [])
+            })
+        
+        return {
+            "success": True,
+            "restaurantName": ACTIVE_RESTAURANT,
+            "categories": categories_array
+        }
+    
+    except Exception as e:
+        print(f"[錯誤] 獲取菜單失敗: {e}")
+        return {
+            "success": False,
+            "message": f"獲取菜單時發生錯誤: {str(e)}",
+            "restaurantName": None,
+            "categories": []
+        }
+
 
 @app.post("/api/search-foodpanda", response_model=FoodpandaSearchResp)
 async def api_search_foodpanda(req: FoodpandaSearchReq):
@@ -329,9 +373,9 @@ async def api_search_foodpanda(req: FoodpandaSearchReq):
 @app.post("/api/crawl-foodpanda", response_model=FoodpandaResp)
 async def api_crawl_foodpanda(req: FoodpandaReq):
     """
-    爬取餐廳菜單（使用 quick_manual_crawl.py）
+    爬取餐廳菜單（使用 crawl_menu.py）
     
-    這個 API 會呼叫 quick_manual_crawl.py 進行半自動爬蟲：
+    這個 API 會呼叫 crawl_menu.py 進行半自動爬蟲：
     1. 自動開啟 Chrome 並搜尋餐廳
     2. 需要手動點擊菜單頁面（避免反爬蟲機制）
     3. 自動爬取菜單資料
@@ -357,8 +401,8 @@ async def api_crawl_foodpanda(req: FoodpandaReq):
         print(f"[調試] 當前工作目錄 = {os.getcwd()}")
         print(f"[調試] CRAWLER_AVAILABLE = {CRAWLER_AVAILABLE}")
         
-        # 使用 quick_manual_crawl.quick_crawl() 進行爬取
-        restaurant = await quick_manual_crawl.quick_crawl(restaurant_name)
+        # 使用  .quick_crawl() 進行爬取
+        restaurant = await crawl_menu.quick_crawl(restaurant_name)
         
         if restaurant and restaurant.menu_items:
             print(f"[爬蟲] 成功爬取 {len(restaurant.menu_items)} 道菜")
@@ -513,6 +557,48 @@ def switch_restaurant(restaurant_name: str):
         "activeRestaurant": ACTIVE_RESTAURANT
     }
 
+@app.delete("/api/menu/{restaurant_name}")
+def delete_menu(restaurant_name: str):
+    """刪除指定餐廳的菜單（從記憶體和磁碟）"""
+    global ACTIVE_RESTAURANT, menu, RESTAURANT_MENUS
+    
+    # 檢查餐廳是否存在
+    if restaurant_name not in RESTAURANT_MENUS:
+        raise HTTPException(404, f"餐廳 '{restaurant_name}' 不存在")
+    
+    # 1. 從記憶體中移除
+    del RESTAURANT_MENUS[restaurant_name]
+    
+    # 2. 刪除對應的 JSON 檔案
+    menu_file = os.path.join(PROJECT_ROOT, f"menu_{restaurant_name}.json")
+    
+    if os.path.exists(menu_file):
+        try:
+            os.remove(menu_file)
+            print(f"[刪除] 已刪除檔案: {menu_file}")
+        except Exception as e:
+            print(f"[錯誤] 刪除檔案失敗: {e}")
+            raise HTTPException(500, f"刪除檔案失敗: {str(e)}")
+    
+    # 3. 如果刪除的是當前活動餐廳，切換到其他餐廳
+    if ACTIVE_RESTAURANT == restaurant_name:
+        if RESTAURANT_MENUS:
+            # 切換到第一個可用的餐廳
+            ACTIVE_RESTAURANT = next(iter(RESTAURANT_MENUS.keys()))
+            menu = RESTAURANT_MENUS[ACTIVE_RESTAURANT]
+            print(f"[切換] 已自動切換至: {ACTIVE_RESTAURANT}")
+        else:
+            # 沒有其他餐廳了
+            ACTIVE_RESTAURANT = None
+            menu = {"restaurants": {}}
+            print(f"[警告] 已無可用餐廳")
+    
+    return {
+        "success": True,
+        "message": f"已成功刪除 {restaurant_name}",
+        "activeRestaurant": ACTIVE_RESTAURANT
+    }
+
 @app.post("/api/update-menu", response_model=UpdateMenuResp)
 async def update_menu(req: UpdateMenuReq):
     """遠端觸發爬蟲更新菜單"""
@@ -535,7 +621,7 @@ async def update_menu(req: UpdateMenuReq):
         print(f"[調試] PROJECT_ROOT = {PROJECT_ROOT}")
         print(f"[調試] 當前工作目錄 = {os.getcwd()}")
         
-        restaurant = await quick_manual_crawl.quick_crawl(restaurant_name)
+        restaurant = await crawl_menu.quick_crawl(restaurant_name)
         
         if restaurant and restaurant.menu_items:
             print(f"[爬蟲] 成功爬取 {len(restaurant.menu_items)} 道菜")

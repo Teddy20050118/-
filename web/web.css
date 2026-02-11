@@ -1190,6 +1190,234 @@ body {
   }
 }
 
+/* ============================================
+   Menu Modal Styles
+   ============================================ */
+.menu-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.menu-modal.hidden {
+  display: none;
+}
+
+.menu-modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease;
+}
+
+[data-theme="dark"] .menu-modal-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.menu-modal-content {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  width: 100%;
+  max-width: 800px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease;
+  border: 1px solid var(--border);
+}
+
+.menu-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.menu-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--fg);
+  margin: 0;
+}
+
+.menu-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--fg-muted);
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.menu-modal-close:hover {
+  background: var(--surface-strong);
+  color: var(--fg);
+}
+
+.menu-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.menu-loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--fg-muted);
+  font-size: 16px;
+}
+
+.menu-category {
+  margin-bottom: 32px;
+}
+
+.menu-category:last-child {
+  margin-bottom: 0;
+}
+
+.menu-category-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg);
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--primary);
+}
+
+.menu-items {
+  display: grid;
+  gap: 12px;
+}
+
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--surface-strong);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.menu-item:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  transform: translateX(4px);
+}
+
+.menu-item-name {
+  font-size: 15px;
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.menu-item-price {
+  font-size: 15px;
+  color: var(--primary);
+  font-weight: 700;
+  white-space: nowrap;
+  margin-left: 16px;
+}
+
+.menu-error {
+  text-align: center;
+  padding: 40px 20px;
+  color: #dc2626;
+  font-size: 16px;
+}
+
+.menu-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--fg-muted);
+  font-size: 16px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .menu-modal {
+    padding: 12px;
+  }
+  
+  .menu-modal-content {
+    max-height: 90vh;
+    border-radius: 12px;
+  }
+  
+  .menu-modal-header {
+    padding: 16px 20px;
+  }
+  
+  .menu-modal-title {
+    font-size: 18px;
+  }
+  
+  .menu-modal-body {
+    padding: 20px;
+  }
+  
+  .menu-category {
+    margin-bottom: 24px;
+  }
+  
+  .menu-category-title {
+    font-size: 16px;
+  }
+  
+  .menu-item {
+    padding: 10px 14px;
+  }
+  
+  .menu-item-name,
+  .menu-item-price {
+    font-size: 14px;
+  }
+}
+
 /* 添加視口設定提示 */
 /* 請確保 HTML 中有以下 meta 標籤：
    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
