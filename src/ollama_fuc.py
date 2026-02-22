@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 #從環境變數讀取設定
-DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
+DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:12b")
 OLLAMA_BIN = os.getenv("OLLAMA_BIN", "ollama")
 
 def _cli_available() -> bool:
@@ -84,7 +84,7 @@ def _build_prompt_from_messages(messages: List[Dict[str, str]]) -> str:
     parts.append("助理:")
     return "\n".join(parts)
 #把多輪對話messages轉成一段提示字串，再用CLI方式呼叫Ollama
-def chat(messages: List[Dict[str, str]], model: Optional[str] = None, timeout: float = 120.0) -> str:
+def chat(messages: List[Dict[str, str]], model: Optional[str] = None, timeout: float = 180.0) -> str:
     mdl = model or DEFAULT_MODEL
     prompt = _build_prompt_from_messages(messages)
     return _cli_run(["run", mdl], input_text=prompt, timeout=timeout)
@@ -232,7 +232,7 @@ def recommend(menu: Dict[str, Any], prefs: Optional[Dict[str, Any]] = None, top_
         """ 使用 LLM 批次智能分類菜品（一次處理多個，提升效率）"""
         try:
             # 使用更小更快的模型
-            model = os.environ.get("CLASSIFY_MODEL", "gemma3:latest")
+            model = os.environ.get("CLASSIFY_MODEL", "gemma3:12b")
             
             # 建立菜品列表字串
             items_text = "\n".join([f"{i+1}. {item.get('name', '')}" for i, item in enumerate(items)])
@@ -280,7 +280,7 @@ side
         name = str(item.get("name", ""))
         
         try:
-            model = os.environ.get("CLASSIFY_MODEL", "gemma3:latest")
+            model = os.environ.get("CLASSIFY_MODEL", "gemma3:12b")
             
             prompt = f"""請分類這道菜品屬於哪一類，只回答一個代碼：
 - main: 主食/主餐（漢堡、套餐、吐司、貝果、米飯、麵食等）

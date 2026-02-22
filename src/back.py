@@ -6,9 +6,22 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import asyncio
+import concurrent.futures
 
 if sys.platform.startswith('win32'):
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+def _run_crawler(restaurant_name: str):
+    """在獨立執行緒 + 全新 ProactorEventLoop 跑爬蟲，避免與 uvicorn SelectorEventLoop 衝突"""
+    import asyncio
+    loop = asyncio.new_event_loop()
+    if sys.platform.startswith('win32'):
+        loop = asyncio.ProactorEventLoop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(crawl_menu.quick_crawl(restaurant_name))
+    finally:
+        loop.close()
    
 # 確保可以從 src/ 匯入模組
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -401,8 +414,10 @@ async def api_crawl_foodpanda(req: FoodpandaReq):
         print(f"[調試] 當前工作目錄 = {os.getcwd()}")
         print(f"[調試] CRAWLER_AVAILABLE = {CRAWLER_AVAILABLE}")
         
-        # 使用  .quick_crawl() 進行爬取
-        restaurant = await crawl_menu.quick_crawl(restaurant_name)
+        # 使用獨立 thread + ProactorEventLoop 跑爬蟲（避免與 uvicorn event loop 衝突）
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            restaurant = await loop.run_in_executor(pool, _run_crawler, restaurant_name)
         
         if restaurant and restaurant.menu_items:
             print(f"[爬蟲] 成功爬取 {len(restaurant.menu_items)} 道菜")
@@ -621,7 +636,9 @@ async def update_menu(req: UpdateMenuReq):
         print(f"[調試] PROJECT_ROOT = {PROJECT_ROOT}")
         print(f"[調試] 當前工作目錄 = {os.getcwd()}")
         
-        restaurant = await crawl_menu.quick_crawl(restaurant_name)
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            restaurant = await loop.run_in_executor(pool, _run_crawler, restaurant_name)
         
         if restaurant and restaurant.menu_items:
             print(f"[爬蟲] 成功爬取 {len(restaurant.menu_items)} 道菜")

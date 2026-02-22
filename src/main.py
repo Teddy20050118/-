@@ -4,7 +4,7 @@ import os, json, re, shutil, subprocess, random, time
 from typing import Dict, List, Optional, TypedDict, Literal, Tuple
 
 
-DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
+DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:12b")
 OLLAMA_BIN = os.getenv("OLLAMA_BIN", "ollama")
 
 def _cli_available() -> bool:
@@ -400,7 +400,8 @@ def merge_prefs_inplace(base: Preferences, delta: Preferences) -> None:
         base["preferredDish"] = delta["preferredDish"]
         print(f" [DEBUG merge_prefs] 更新菜品偏好: {delta['preferredDish']}")
 
-def format_recommend_text(rec: Dict[str, object]) -> str:
+def _fallback_format(rec: Dict[str, object]) -> str:
+    """備用模板（LLM 失敗時使用）—— 原 format_recommend_text 邏輯完整保留。"""
     """將推薦結果整理成 Gemini 風格：有段落、理由、預算計算。"""
 
     items = rec.get("items") if isinstance(rec, dict) else None
@@ -544,6 +545,100 @@ def format_recommend_text(rec: Dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+# ──────────────────────────────────────────────────
+#  LLM 二次生成回覆
+# ──────────────────────────────────────────────────
+
+def _build_recommendation_prompt(rec: Dict[str, object], user_input: str) -> str:
+    """把推薦 JSON + 用戶輸入 → 適合丟給 LLM 的 Prompt 字串。
+
+    原理：LLM 的輸出品質 80% 取決於 Prompt 設計。
+    好的 Prompt 要有：角色設定、結構化資料、明確格式指示、字數限制。
+    """
+    items   = rec.get("items") if isinstance(rec, dict) else []
+    meta    = rec.get("meta")  if isinstance(rec, dict) else {}
+    if not isinstance(items, list): items = []
+    if not isinstance(meta,  dict): meta  = {}
+
+    budget     = meta.get("budget")
+    people     = meta.get("people")
+    need_drink = meta.get("needDrink", False)
+
+    # 計算總價（含 10% 服務費）
+    subtotal = sum(
+        float(it.get("price") or 0)
+        for it in items
+        if isinstance(it, dict) and it.get("price") is not None
+    )
+    service = round(subtotal * 0.1, 1)
+    total   = subtotal + service
+
+    items_json = json.dumps(items, ensure_ascii=False, indent=2)
+
+    return f"""你是一位親切的台灣中文點餐助理。請根據以下推薦清單，用自然、有溫度的繁體中文回覆使用者。
+
+【使用者需求】
+{user_input}
+
+【推薦清單（結構化資料）】
+{items_json}
+
+【預算資訊】
+- 人數：{people or "未指定"}
+- 預算：{f"NT${int(budget)}" if budget else "未指定"}
+- 需要飲料：{"是" if need_drink else "否"}
+- 餐點小計：約 NT${subtotal:.0f}
+- 10% 服務費：約 NT${service:.0f}
+- 總計：約 NT${total:.0f}
+
+【回覆要求】
+1. 開場要有溫度，自然呼應使用者的需求，不要複製貼上需求文字
+2. 逐一介紹推薦菜品，說明為什麼這道適合（別只複製 reason 欄位的字）
+3. 最後加一段「預算試算」，數字要跟上面一致
+4. 結尾自然詢問是否需要調整，不要用制式的「如有需要請告知」
+5. 全程繁體中文，語氣像真人朋友，不要條列太多符號
+6. 控制在 300 字以內
+"""
+
+
+def generate_ai_reply(
+    rec: Dict[str, object],
+    user_input: str,
+    model: Optional[str] = None,
+    timeout: float = 180.0,
+) -> str:
+    """呼叫 Gemma3 把推薦 JSON 轉成自然語言回覆。
+
+    原理：這是「同步」函數，因為 ollama_fuc.chat() 底層
+    是同步呼叫 ollama CLI subprocess。
+    LLM 失敗（超時、模型不存在等）時自動降級到 _fallback_format，
+    確保服務不中斷。
+    """
+    from ollama_fuc import chat as _ollama_chat
+
+    mdl    = model or os.environ.get("OLLAMA_MODEL", "gemma3:12b")
+    prompt = _build_recommendation_prompt(rec, user_input)
+
+    try:
+        response = _ollama_chat(
+            [{"role": "user", "content": prompt}],
+            model=mdl,
+            timeout=timeout,
+        )
+        cleaned = response.strip() if isinstance(response, str) else ""
+        if cleaned:
+            return cleaned
+        print(" [generate_ai_reply] LLM 返回空回覆，降級使用模板")
+        return _fallback_format(rec)
+    except Exception as e:
+        print(f" [generate_ai_reply] 錯誤: {e}，降級使用模板")
+        return _fallback_format(rec)
+
+
+# 向後相容：舊名稱保留為 alias，避免其他地方呼叫出錯
+format_recommend_text = _fallback_format
+
+
 # 既有骨架占位
 def menu_to_json():
     # 從自由文字解析 補上文字->JSON 的parser
@@ -576,7 +671,7 @@ def generate_conversation(
             raise RuntimeError("推薦功能未載入")
            # reply="123" #///////////////////////////////////
         rec = ollama_recommend(menu, prefs, top_k=5, model=model)
-        reply = format_recommend_text(rec)
+        reply = generate_ai_reply(rec, user_input)
     except Exception as e:
         reply = f"推薦發生錯誤：{e}"
 
