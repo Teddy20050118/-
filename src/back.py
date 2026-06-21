@@ -48,6 +48,8 @@ except ImportError as e:
     print(f"[警告] 無法匯入 crawl_menu: {e}")
     CRAWLER_AVAILABLE = False
 
+from restaurant_reviews import load_review_cache, refresh_restaurant_reviews
+
 # 專案路徑設定（PROJECT_ROOT 已在上方第16行定義）
 WEB_DIR = os.path.join(PROJECT_ROOT, "web")
 LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
@@ -333,6 +335,9 @@ class UpdateMenuResp(BaseModel):
     restaurant_name: Optional[str] = None
     menu_items_count: Optional[int] = None
 
+class RestaurantReviewRefreshReq(BaseModel):
+    restaurant_name: str
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -551,6 +556,47 @@ def api_chat(req: ChatReq):
     _log_chat(req.sessionId, req.text, reply, prefs)
 
     return {"reply": reply}
+
+@app.get("/api/restaurant-review")
+def get_restaurant_review(restaurant_name: Optional[str] = None):
+    """讀取餐廳評價快取；不觸發網路搜尋。"""
+    target = restaurant_name or ACTIVE_RESTAURANT
+    if not target:
+        return {
+            "success": False,
+            "message": "尚未選擇餐廳",
+            "restaurantName": None,
+            "updatedAt": None,
+            "overallScore": 0,
+            "sentiment": "unknown",
+            "summary": "",
+            "pros": [],
+            "cons": [],
+            "recommendedFor": [],
+            "riskLevel": "low",
+            "riskReasons": [],
+            "sources": [],
+        }
+    return load_review_cache(PROJECT_ROOT, target)
+
+@app.post("/api/restaurant-review/refresh")
+async def refresh_restaurant_review(req: RestaurantReviewRefreshReq):
+    """手動更新餐廳評價情報，完成後寫入本機 JSON 快取。"""
+    restaurant_name = (req.restaurant_name or "").strip()
+    if not restaurant_name:
+        raise HTTPException(400, "restaurant_name 不可為空")
+    if RESTAURANT_MENUS and restaurant_name not in RESTAURANT_MENUS:
+        raise HTTPException(404, f"餐廳 '{restaurant_name}' 不存在")
+
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(
+            None,
+            lambda: refresh_restaurant_reviews(PROJECT_ROOT, restaurant_name),
+        )
+    except Exception as e:
+        print(f"[評價] 更新失敗: {e}")
+        raise HTTPException(500, f"更新評價失敗: {str(e)}")
 
 # 多餐廳管理 API
 @app.get("/api/restaurants")

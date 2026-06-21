@@ -13,6 +13,9 @@ venv/
 logs/*.jsonl
 logs/*.log
 
+# Local restaurant review cache
+reviews_*.json
+
 # Local secrets
 .env
 

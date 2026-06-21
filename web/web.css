@@ -226,6 +226,186 @@ body {
   box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
+.review-panel {
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.review-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.review-title {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.review-updated {
+  color: var(--fg-muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.review-refresh {
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.review-refresh:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.review-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.review-empty,
+.review-muted {
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.review-score-row {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.review-score {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.review-sentiment {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.review-risk {
+  display: inline-flex;
+  margin-top: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.review-risk.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.review-risk.high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.review-summary {
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.review-section {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.review-section-title {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+
+.review-section ul {
+  padding-left: 18px;
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.review-sources {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.review-sources summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.review-source {
+  display: block;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  text-decoration: none;
+  background: var(--surface-strong);
+}
+
+.review-source span {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-source small {
+  display: -webkit-box;
+  color: var(--fg-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 4px;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+[data-theme="dark"] .review-risk {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+}
+
+[data-theme="dark"] .review-risk.medium {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+}
+
+[data-theme="dark"] .review-risk.high {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+
 /* ============================================
    Sidebar Actions
    ============================================ */
