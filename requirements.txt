@@ -1,6 +1,10 @@
 fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.5
+python-multipart>=0.0.9
+beautifulsoup4>=4.12
+Pillow>=10.2
+pillow-heif>=0.18
 
 # MySQL
 mysql-connector-python>=9.0

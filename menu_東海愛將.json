@@ -1,0 +1,114 @@
+{
+  "name": "東海愛將",
+  "source": "user_photo_vlm",
+  "source_type": "menu",
+  "confidence": 0.0,
+  "warnings": [],
+  "menu_items": [
+    {
+      "name": "雞頂牛排",
+      "price": 330.0,
+      "category": "牛排"
+    },
+    {
+      "name": "帶骨牛小排",
+      "price": 370.0,
+      "category": "牛排"
+    },
+    {
+      "name": "沙朗牛排",
+      "price": 300.0,
+      "category": "牛排"
+    },
+    {
+      "name": "紐約客牛排",
+      "price": 430.0,
+      "category": "牛排"
+    },
+    {
+      "name": "下骨牛排",
+      "price": 330.0,
+      "category": "牛排"
+    },
+    {
+      "name": "沙朗牛排給盤",
+      "price": 330.0,
+      "category": "牛排"
+    },
+    {
+      "name": "西冷牛排",
+      "price": 330.0,
+      "category": "牛排"
+    },
+    {
+      "name": "原味沙朗",
+      "price": 330.0,
+      "category": "牛排"
+    },
+    {
+      "name": "菲力牛排",
+      "price": 560.0,
+      "category": "牛排"
+    },
+    {
+      "name": "黃板牛排",
+      "price": 330.0,
+      "category": "牛排"
+    },
+    {
+      "name": "大客牛排",
+      "price": 480.0,
+      "category": "牛排"
+    },
+    {
+      "name": "雞頂豬排",
+      "price": 230.0,
+      "category": "豬排"
+    },
+    {
+      "name": "黃金豬排",
+      "price": 270.0,
+      "category": "豬排"
+    },
+    {
+      "name": "香焜雞排",
+      "price": 240.0,
+      "category": "豬排"
+    },
+    {
+      "name": "飯飯雞排",
+      "price": 280.0,
+      "category": "豬排"
+    },
+    {
+      "name": "電烤中卷",
+      "price": 130.0,
+      "category": "海鮮"
+    },
+    {
+      "name": "香煎鱈魚",
+      "price": 340.0,
+      "category": "海鮮"
+    },
+    {
+      "name": "香酥排骨",
+      "price": 300.0,
+      "category": "其他"
+    },
+    {
+      "name": "香食都鼬排",
+      "price": 300.0,
+      "category": "其他"
+    },
+    {
+      "name": "風味鱈魚排",
+      "price": 300.0,
+      "category": "其他"
+    },
+    {
+      "name": "素食排餐",
+      "price": 250.0,
+      "category": "其他"
+    }
+  ]
+}

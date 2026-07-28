@@ -40,7 +40,11 @@
             <div class="review-title">評價情報</div>
             <div id="review-updated" class="review-updated">尚未更新</div>
           </div>
-          <button id="refresh-review-btn" class="ghost-btn review-refresh" type="button">更新</button>
+          <div class="review-head-actions">
+            <button id="change-review-identity-btn" class="ghost-btn review-change" type="button"
+              title="變更評價對應的餐廳分店" hidden>換分店</button>
+            <button id="refresh-review-btn" class="ghost-btn review-refresh" type="button">取得評價</button>
+          </div>
         </div>
         <div id="review-content" class="review-content">
           <div class="review-empty">選擇餐廳後可查看評價摘要</div>
@@ -85,7 +89,11 @@
             <button id="help-btn" class="ghost-btn" type="button">使用說明</button>
           </div>
           <div class="header-actions-right">
+            <button id="mobile-review-btn" class="ghost-btn mobile-review-btn" type="button"
+              title="查看餐廳評價">查看評價</button>
             <button id="view-menu-btn" class="ghost-btn" type="button" title="查看完整菜單">查看菜單</button>
+            <button id="scan-menu-btn" class="ghost-btn scan-menu-btn" type="button"
+              title="拍攝或上傳菜單照片">拍照辨識</button>
             <button id="crawl-btn" class="ghost-btn" type="button" title="爬取新餐廳菜單">爬菜單</button>
           </div>
         </div>
@@ -139,6 +147,65 @@
     </div>
   </div>
 
+  <div id="vision-modal" class="menu-modal hidden" role="dialog" aria-modal="true"
+    aria-labelledby="vision-modal-title">
+    <div class="menu-modal-overlay"></div>
+    <div class="menu-modal-content vision-modal-content">
+      <div class="menu-modal-header">
+        <div>
+          <h2 id="vision-modal-title" class="menu-modal-title">拍照新增餐廳</h2>
+          <p class="vision-modal-subtitle">拍下菜單、價目牌或店內陳列的菜色，AI 會整理成餐廳菜單。</p>
+        </div>
+        <button id="vision-modal-close" class="menu-modal-close" type="button" aria-label="關閉">&times;</button>
+      </div>
+      <form id="vision-upload-form" class="vision-upload-form">
+        <label class="vision-field">
+          <span>餐廳名稱 <small>（照片上有清楚店名時可留空）</small></span>
+          <input id="vision-restaurant-name" type="text" maxlength="120" placeholder="例如：東海牛肉麵" />
+        </label>
+        <label id="vision-drop-zone" class="vision-drop-zone" for="vision-image-input">
+          <input id="vision-image-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+            capture="environment" hidden />
+          <img id="vision-preview" alt="待辨識照片預覽" hidden />
+          <span id="vision-picker-copy">
+            <strong>拍照或選擇照片</strong>
+            <small>支援 JPEG、PNG、WebP、HEIC，最大 10 MB</small>
+          </span>
+        </label>
+        <div id="vision-status" class="vision-status" aria-live="polite"></div>
+        <div class="vision-actions">
+          <button id="vision-submit-btn" class="action-btn primary" type="submit" disabled>開始辨識並新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="review-identity-modal" class="menu-modal hidden" role="dialog" aria-modal="true"
+    aria-labelledby="review-identity-title">
+    <div class="menu-modal-overlay"></div>
+    <div class="menu-modal-content review-identity-modal-content">
+      <div class="menu-modal-header">
+        <h2 id="review-identity-title" class="menu-modal-title">確認餐廳分店</h2>
+        <button id="review-identity-close" class="menu-modal-close" type="button" aria-label="關閉">&times;</button>
+      </div>
+      <div id="review-identity-body" class="menu-modal-body">
+        <div class="menu-loading">搜尋中...</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="mobile-review-modal" class="menu-modal hidden" role="dialog" aria-modal="true"
+    aria-labelledby="mobile-review-title">
+    <div class="menu-modal-overlay"></div>
+    <div class="menu-modal-content mobile-review-modal-content">
+      <div class="menu-modal-header">
+        <h2 id="mobile-review-title" class="menu-modal-title">餐廳評價情報</h2>
+        <button id="mobile-review-close" class="menu-modal-close" type="button" aria-label="關閉">&times;</button>
+      </div>
+      <div id="mobile-review-body" class="menu-modal-body"></div>
+    </div>
+  </div>
+
   <script>
     (() => {
       const STORAGE_KEY = 'ordering_assistant_threads_v1';
@@ -151,6 +218,16 @@
       const importJsonBtn = document.getElementById('import-json-btn');
       const importFileEl = document.getElementById('import-file');
       const crawlBtn = document.getElementById('crawl-btn');
+      const scanMenuBtn = document.getElementById('scan-menu-btn');
+      const visionModal = document.getElementById('vision-modal');
+      const visionModalClose = document.getElementById('vision-modal-close');
+      const visionUploadForm = document.getElementById('vision-upload-form');
+      const visionRestaurantName = document.getElementById('vision-restaurant-name');
+      const visionImageInput = document.getElementById('vision-image-input');
+      const visionPreview = document.getElementById('vision-preview');
+      const visionPickerCopy = document.getElementById('vision-picker-copy');
+      const visionStatus = document.getElementById('vision-status');
+      const visionSubmitBtn = document.getElementById('vision-submit-btn');
       const clearBtn = document.getElementById('clear-btn');
       const helpBtn = document.getElementById('help-btn');
       const themeToggleBtn = document.getElementById('theme-toggle-btn');
@@ -259,6 +336,135 @@
         if (x) x.addEventListener('click', close);
         window.setTimeout(close, timeoutMs);
       };
+
+      let visionPreviewUrl = '';
+      const closeVisionModal = () => {
+        visionModal?.classList.add('hidden');
+      };
+      const openVisionModal = () => {
+        visionModal?.classList.remove('hidden');
+        visionStatus.textContent = '';
+        visionRestaurantName?.focus();
+      };
+
+      scanMenuBtn?.addEventListener('click', openVisionModal);
+      visionModalClose?.addEventListener('click', closeVisionModal);
+      visionModal?.querySelector('.menu-modal-overlay')?.addEventListener('click', closeVisionModal);
+      visionImageInput?.addEventListener('change', () => {
+        const file = visionImageInput.files?.[0];
+        if (visionPreviewUrl) URL.revokeObjectURL(visionPreviewUrl);
+        visionPreviewUrl = '';
+        if (!file) {
+          visionPreview.hidden = true;
+          visionPickerCopy.hidden = false;
+          visionSubmitBtn.disabled = true;
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          visionStatus.textContent = '圖片不可超過 10 MB。';
+          visionImageInput.value = '';
+          visionSubmitBtn.disabled = true;
+          return;
+        }
+        visionPreviewUrl = URL.createObjectURL(file);
+        visionPreview.src = visionPreviewUrl;
+        visionPreview.hidden = false;
+        visionPickerCopy.hidden = true;
+        visionStatus.textContent = `已選擇：${file.name}`;
+        visionSubmitBtn.disabled = false;
+      });
+
+      visionUploadForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const file = visionImageInput.files?.[0];
+        if (!file || visionSubmitBtn.disabled) return;
+        const formData = new FormData();
+        formData.append('restaurant_name', visionRestaurantName.value.trim());
+        formData.append('image', file);
+        visionSubmitBtn.disabled = true;
+        visionSubmitBtn.textContent = '辨識中…';
+        visionStatus.textContent = '正在進行全圖判讀、四區塊 OCR 與校對，密集菜單可能需要數分鐘，請勿關閉頁面。';
+        try {
+          const response = await fetch('/api/menu/vision', { method: 'POST', body: formData });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.success) throw new Error(data.detail || data.message || '辨識失敗');
+          let currentAnalysis = data;
+          const previewText = (analysis) => {
+            const rows = [];
+            (analysis.categories || []).forEach(category => {
+              (category.items || []).forEach(item => {
+                const price = item.price == null ? '價格不明' : `$${Number(item.price).toFixed(0)}`;
+                rows.push(`${rows.length + 1}. [${category.name || '其他'}] ${item.name} — ${price}`);
+              });
+            });
+            return rows.slice(0, 40).join('\n') + (rows.length > 40 ? `\n…另有 ${rows.length - 40} 項` : '');
+          };
+          while (true) {
+            const correction = window.prompt(
+              `請先檢查暫存菜單：\n\n${previewText(currentAnalysis)}\n\n` +
+              '若有錯誤，請輸入「改 3 菜名 豬腳飯」或「改 3 價格 90」。\n' +
+              '不需修改請留空並按確定；按取消則不會存檔。',
+              ''
+            );
+            if (correction === null) {
+              visionStatus.textContent = '辨識已完成，但你尚未確認，因此沒有寫入餐廳資料。';
+              return;
+            }
+            if (!correction.trim()) break;
+            const correctionResponse = await fetch(`/api/menu/vision/${encodeURIComponent(currentAnalysis.analysisId)}/correct`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ instruction: correction.trim() })
+            });
+            const corrected = await correctionResponse.json().catch(() => ({}));
+            if (!correctionResponse.ok || !corrected.success) {
+              window.alert(corrected.detail || corrected.message || '修正失敗，請依照菜單中的完整名稱或編號再試一次。');
+              continue;
+            }
+            currentAnalysis = corrected;
+            visionStatus.textContent = `${corrected.correctionMessage}；目前仍是暫存資料。`;
+          }
+
+          const candidate = currentAnalysis.restaurantNameCandidate || visionRestaurantName.value.trim();
+          const coverage = Math.round(Number(currentAnalysis.priceCoverage || 0) * 100);
+          const conflictCount = Array.isArray(currentAnalysis.conflicts) ? currentAnalysis.conflicts.length : 0;
+          const warning = Array.isArray(currentAnalysis.warnings) && currentAnalysis.warnings.length ? `\n提醒：${currentAnalysis.warnings.join('、')}` : '';
+          visionStatus.textContent = `檢查完成，尚未存檔。可能店名：${candidate || '未辨識'}；${currentAnalysis.itemCount} 道菜；價格覆蓋率 ${coverage}%；衝突 ${conflictCount} 組。${warning}`;
+
+          let confirmedName = visionRestaurantName.value.trim() || candidate;
+          if (!confirmedName) {
+            confirmedName = window.prompt('無法辨識店名，請輸入餐廳名稱：', '')?.trim() || '';
+          }
+          if (!confirmedName) throw new Error('尚未提供餐廳名稱，辨識結果未存檔。');
+          const conflictWarning = data.identityConflict || conflictCount
+            ? '\n\n注意：店名或 OCR 候選有衝突，確認代表接受目前摘要。'
+            : '';
+          const accepted = window.confirm(
+            `要將這份菜單建立為「${confirmedName}」嗎？\n${currentAnalysis.itemCount} 道菜，價格覆蓋率 ${coverage}%。${conflictWarning}`
+          );
+          if (!accepted) {
+            visionStatus.textContent += '\n你尚未確認，因此沒有寫入餐廳資料。';
+            return;
+          }
+          const confirmResponse = await fetch(`/api/menu/vision/${encodeURIComponent(currentAnalysis.analysisId)}/confirm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ restaurant_name: confirmedName, accept_conflicts: true })
+          });
+          const confirmed = await confirmResponse.json().catch(() => ({}));
+          if (!confirmResponse.ok || !confirmed.success) throw new Error(confirmed.detail || confirmed.message || '確認存檔失敗');
+          visionStatus.textContent = `已確認並新增「${confirmed.restaurantName}」的 ${confirmed.itemCount} 道菜。`;
+          showToast({ message: `已新增 ${confirmed.restaurantName}（${confirmed.itemCount} 道菜）`, timeoutMs: 5000 });
+          await loadRestaurants();
+          window.setTimeout(closeVisionModal, 1200);
+        } catch (error) {
+          visionStatus.textContent = error.message || '照片辨識失敗，請稍後再試。';
+          showToast({ message: visionStatus.textContent, timeoutMs: 6000 });
+        } finally {
+          visionSubmitBtn.disabled = false;
+          visionSubmitBtn.textContent = '開始辨識並新增';
+        }
+      });
 
       const closeThreadMenu = () => {
         if (!chatMenuEl) return;
@@ -841,9 +1047,23 @@
       const restaurantSelect = document.getElementById('restaurant-select');
       const restaurantSelectMobile = document.getElementById('restaurant-select-mobile');
       const restaurantInfo = document.getElementById('restaurant-info');
+      const reviewPanel = document.getElementById('review-panel');
       const reviewContent = document.getElementById('review-content');
       const reviewUpdated = document.getElementById('review-updated');
       const refreshReviewBtn = document.getElementById('refresh-review-btn');
+      const changeReviewIdentityBtn = document.getElementById('change-review-identity-btn');
+      const reviewIdentityModal = document.getElementById('review-identity-modal');
+      const reviewIdentityBody = document.getElementById('review-identity-body');
+      const reviewIdentityClose = document.getElementById('review-identity-close');
+      const reviewIdentityOverlay = reviewIdentityModal?.querySelector('.menu-modal-overlay');
+      const mobileReviewBtn = document.getElementById('mobile-review-btn');
+      const mobileReviewModal = document.getElementById('mobile-review-modal');
+      const mobileReviewBody = document.getElementById('mobile-review-body');
+      const mobileReviewClose = document.getElementById('mobile-review-close');
+      const mobileReviewOverlay = mobileReviewModal?.querySelector('.menu-modal-overlay');
+      const reviewPanelHome = reviewPanel?.parentNode;
+      const reviewPanelNextSibling = reviewPanel?.nextSibling;
+      let currentReviewData = null;
 
       const getSelectedRestaurantName = () => {
         const name = restaurantSelect?.value || restaurantSelectMobile?.value || '';
@@ -861,6 +1081,7 @@
       const riskLabel = (level) => {
         if (level === 'high') return '高風險';
         if (level === 'medium') return '中風險';
+        if (level === 'unknown') return '風險未知';
         return '低風險';
       };
 
@@ -877,53 +1098,138 @@
         return `<ul>${list.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
       };
 
+      const sourceTypeLabel = (type) => ({
+        review_platform: '評論平台',
+        forum: '論壇',
+        blog: '部落格',
+        aggregator: '彙整站',
+        official: '官方',
+        web: '網頁'
+      }[type] || '網頁');
+
+      const renderEvidenceList = (highlights, fallbackItems, evidenceMap, sourceMap, emptyText) => {
+        const rows = Array.isArray(highlights) && highlights.length
+          ? highlights
+          : (Array.isArray(fallbackItems) ? fallbackItems.map(text => ({ text, evidenceIds: [] })) : []);
+        if (!rows.length) return `<div class="review-muted">${escapeHtml(emptyText)}</div>`;
+        return `<ul>${rows.map(row => {
+          const links = (row.evidenceIds || []).map(id => {
+            const evidence = evidenceMap.get(id);
+            const source = evidence && sourceMap.get(evidence.sourceId);
+            if (!source?.url) return '';
+            return `<a class="review-evidence-link" href="${escapeHtml(source.url)}" target="_blank"
+              rel="noopener noreferrer" title="${escapeHtml(evidence.text || source.title)}">${escapeHtml(id)}</a>`;
+          }).filter(Boolean).join(' ');
+          return `<li>${escapeHtml(row.text || '')}${links ? `<span class="review-evidence-links">${links}</span>` : ''}</li>`;
+        }).join('')}</ul>`;
+      };
+
       const renderReview = (data) => {
         if (!reviewContent || !reviewUpdated) return;
+        currentReviewData = data || null;
         reviewUpdated.textContent = formatReviewTime(data?.updatedAt);
 
         if (!data || !data.success) {
+          const identity = data?.restaurantIdentity;
+          if (changeReviewIdentityBtn) changeReviewIdentityBtn.hidden = !identity;
+          if (refreshReviewBtn) refreshReviewBtn.textContent = '取得評價';
           reviewContent.innerHTML = `
             <div class="review-empty">${escapeHtml(data?.message || '尚未更新評價')}</div>
+            ${identity ? `<div class="review-identity">
+              <strong>${escapeHtml(identity.officialName)}</strong>
+              <span>${escapeHtml(identity.address || '地址未提供')}</span>
+            </div>` : ''}
+            ${data?.needsRefresh ? '<div class="review-notice">這是舊版快取，更新後才能顯示來源信心與面向證據。</div>' : ''}
           `;
           return;
         }
 
-        const score = Number(data.overallScore || 0);
+        const recommendationScore = Number(data.recommendationScore ?? data.overallScore ?? 0);
+        const confidenceScore = Number(data.confidenceScore || 0);
         const riskLevel = data.riskLevel || 'low';
         const sources = Array.isArray(data.sources) ? data.sources : [];
+        const evidence = Array.isArray(data.evidence) ? data.evidence : [];
+        const evidenceMap = new Map(evidence.map(item => [item.evidenceId, item]));
+        const sourceMap = new Map(sources.map(item => [item.sourceId, item]));
+        const identity = data.restaurantIdentity;
+        if (changeReviewIdentityBtn) changeReviewIdentityBtn.hidden = !identity;
+        if (refreshReviewBtn) refreshReviewBtn.textContent = '重新整理';
+        const aspects = data.aspects && typeof data.aspects === 'object' ? data.aspects : {};
+        const aspectsHtml = Object.values(aspects).map(aspect => `
+          <div class="review-aspect">
+            <div>
+              <span>${escapeHtml(aspect.label || '')}</span>
+              <small>${aspect.status === 'estimated'
+                ? '低信心參考'
+                : (aspect.score == null ? '公開來源未提到' : `${Number(aspect.mentionCount || 0)} 筆證據`)}</small>
+            </div>
+            <strong>${aspect.score == null ? '未提及' : `${Number(aspect.score)} 分`}</strong>
+          </div>
+        `).join('');
+        const hasAspectScores = Object.values(aspects).some(aspect => aspect?.score != null);
+        const hasPrimaryScore = hasAspectScores || data.scoreBasis === 'platform_rating';
         const sourcesHtml = sources.length
           ? sources.map(source => `
               <a class="review-source" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">
                 <span>${escapeHtml(source.title || source.sourceType || '來源')}</span>
+                <div class="review-source-meta">
+                  <b>${escapeHtml(sourceTypeLabel(source.sourceType))}</b>
+                  <b>品質 ${Math.round(Number(source.sourceQuality || 0) * 100)}</b>
+                  ${source.publishedAt ? `<b>${escapeHtml(new Date(source.publishedAt).toLocaleDateString('zh-TW'))}</b>` : '<b>日期未知</b>'}
+                  ${source.sponsored ? '<b class="sponsored">業配／合作</b>' : ''}
+                  ${source.duplicateOf ? '<b>重複來源</b>' : ''}
+                </div>
                 <small>${escapeHtml(source.excerpt || '')}</small>
               </a>
             `).join('')
           : '<div class="review-muted">沒有可顯示的來源</div>';
 
         reviewContent.innerHTML = `
+          ${identity ? `<div class="review-identity">
+            <strong>${escapeHtml(identity.officialName)}</strong>
+            <span>${escapeHtml(identity.address || '地址未提供')}</span>
+          </div>` : ''}
+          ${data.needsRefresh ? '<div class="review-notice">這是舊版快取，請更新後再參考推薦分、資料信心與風險。</div>' : ''}
           <div class="review-score-row">
-            <div class="review-score">${score}</div>
-            <div>
-              <div class="review-sentiment">${sentimentLabel(data.sentiment)}</div>
-              <div class="review-risk ${riskLevel}">${riskLabel(riskLevel)}</div>
+            <div class="review-metric">
+              <strong>${hasPrimaryScore ? recommendationScore : '—'}</strong>
+              <span>${data.scoreBasis === 'platform_rating' ? '平台評分換算' : '推薦分'}</span>
+            </div>
+            <div class="review-metric confidence">
+              <strong>${confidenceScore}</strong>
+              <span>資料信心 / 100</span>
             </div>
           </div>
+          <div class="review-status-row">
+            <span class="review-sentiment">${sentimentLabel(data.sentiment)}</span>
+            <span class="review-risk ${riskLevel}">${riskLabel(riskLevel)}</span>
+          </div>
           <p class="review-summary">${escapeHtml(data.summary || '目前摘要不足')}</p>
-          <div class="review-section">
-            <div class="review-section-title">優點</div>
-            ${renderList(data.pros, '尚無明確優點')}
-          </div>
-          <div class="review-section">
-            <div class="review-section-title">注意事項</div>
-            ${renderList(data.cons, '尚無明確注意事項')}
-          </div>
-          <div class="review-section">
-            <div class="review-section-title">可信度風險</div>
-            ${renderList(data.riskReasons, '目前未發現明顯灌水訊號')}
-          </div>
-          <details class="review-sources">
-            <summary>查看來源 (${sources.length})</summary>
-            ${sourcesHtml}
+          <div class="review-aspects">${aspectsHtml || '<div class="review-muted">尚無面向資料</div>'}</div>
+          <details class="review-more">
+            <summary>更多資訊</summary>
+            <div class="review-section">
+              <div class="review-section-title">優點</div>
+              ${renderEvidenceList(data.prosEvidence, data.pros, evidenceMap, sourceMap, '尚無明確優點')}
+            </div>
+            <div class="review-section">
+              <div class="review-section-title">注意事項</div>
+              ${renderEvidenceList(data.consEvidence, data.cons, evidenceMap, sourceMap, '尚無明確注意事項')}
+            </div>
+            <div class="review-section">
+              <div class="review-section-title">可信度風險</div>
+              ${renderEvidenceList(
+                data.riskSignals,
+                data.riskReasons,
+                evidenceMap,
+                sourceMap,
+                riskLevel === 'unknown' ? '缺少足夠逐則評論，暫時無法判斷灌水風險' : '目前未發現明顯灌水訊號'
+              )}
+            </div>
+            <details class="review-sources">
+              <summary>查看來源 (${sources.length})</summary>
+              ${sourcesHtml}
+            </details>
           </details>
         `;
       };
@@ -948,32 +1254,105 @@
         }
       }
 
-      async function refreshRestaurantReview() {
-        const target = getSelectedRestaurantName();
-        if (!target) {
-          showToast({ message: '請先選擇一個餐廳', timeoutMs: 2000 });
-          return;
-        }
-        if (!reviewContent || !refreshReviewBtn) return;
-        refreshReviewBtn.disabled = true;
-        reviewUpdated.textContent = '更新中...';
-        reviewContent.innerHTML = '<div class="review-empty">正在搜尋公開評價，可能需要一點時間...</div>';
+      function closeReviewIdentityModal() {
+        reviewIdentityModal?.classList.add('hidden');
+      }
 
+      function openMobileReviewModal() {
+        if (!mobileReviewModal || !mobileReviewBody || !reviewPanel) return;
+        mobileReviewBody.appendChild(reviewPanel);
+        mobileReviewModal.classList.remove('hidden');
+      }
+
+      function closeMobileReviewModal() {
+        if (!mobileReviewModal || !reviewPanel || !reviewPanelHome) return;
+        mobileReviewModal.classList.add('hidden');
+        reviewPanelHome.insertBefore(reviewPanel, reviewPanelNextSibling);
+      }
+
+      function showIdentityCandidates(candidates, target) {
+        if (!reviewIdentityModal || !reviewIdentityBody) return;
+        reviewIdentityModal.classList.remove('hidden');
+        reviewIdentityBody.innerHTML = candidates.length ? `
+          <p class="review-identity-help">找到幾間同名店，請選擇正確分店。</p>
+          <div class="review-candidates">
+            ${candidates.map((candidate, index) => `
+              <button class="review-candidate" type="button" data-candidate-index="${index}">
+                <strong>${escapeHtml(candidate.officialName || target)}</strong>
+                <span>${escapeHtml(candidate.address || '地址未提供')}</span>
+                <b>相符度 ${Number(candidate.confidence || 0)}%</b>
+              </button>
+            `).join('')}
+          </div>
+        ` : '<div class="menu-error">找不到可確認的餐廳分店</div>';
+        reviewIdentityBody.querySelectorAll('[data-candidate-index]').forEach(button => {
+          button.addEventListener('click', () => {
+            const identity = candidates[Number(button.dataset.candidateIndex)];
+            closeReviewIdentityModal();
+            refreshRestaurantReview(identity);
+          });
+        });
+      }
+
+      async function identifyRestaurantReview() {
+        const target = getSelectedRestaurantName();
+        if (!target || !reviewIdentityModal || !reviewIdentityBody) return;
+        reviewIdentityModal.classList.remove('hidden');
+        reviewIdentityBody.innerHTML = '<div class="menu-loading">正在搜尋同名餐廳與分店...</div>';
         try {
-          const response = await fetch('/api/restaurant-review/refresh', {
+          const response = await fetch('/api/restaurant-review/identify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ restaurant_name: target })
           });
           const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || data.message || '店家搜尋失敗');
+          const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+          showIdentityCandidates(candidates, target);
+        } catch (err) {
+          reviewIdentityBody.innerHTML = `<div class="menu-error">${escapeHtml(err.message || '店家搜尋失敗')}</div>`;
+        }
+      }
+
+      async function refreshRestaurantReview(selectedIdentity = null) {
+        const target = getSelectedRestaurantName();
+        if (!target) {
+          showToast({ message: '請先選擇一個餐廳', timeoutMs: 2000 });
+          return;
+        }
+        const identity = selectedIdentity || currentReviewData?.restaurantIdentity || null;
+        const previousData = currentReviewData;
+        if (!reviewContent || !refreshReviewBtn) return;
+        refreshReviewBtn.disabled = true;
+        reviewUpdated.textContent = '更新中...';
+        reviewContent.innerHTML = '<div class="review-empty">正在更新評價...</div>';
+
+        try {
+          const response = await fetch('/api/restaurant-review/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ restaurant_name: target, restaurant_identity: identity })
+          });
+          const data = await response.json();
           if (!response.ok) {
             throw new Error(data.detail || data.message || '更新失敗');
+          }
+          if (data.needsIdentity) {
+            const candidates = Array.isArray(data.identityCandidates) ? data.identityCandidates : [];
+            if (previousData) renderReview(previousData);
+            showIdentityCandidates(candidates, target);
+            return;
           }
           renderReview(data);
           showToast({ message: '評價情報已更新', timeoutMs: 2500 });
         } catch (err) {
           console.error('更新評價失敗:', err);
-          renderReview({ success: false, message: `更新評價失敗: ${err.message || err}` });
+          if (previousData) {
+            renderReview(previousData);
+            showToast({ message: `更新失敗: ${err.message || err}`, timeoutMs: 3500 });
+          } else {
+            renderReview({ success: false, message: `更新評價失敗: ${err.message || err}` });
+          }
         } finally {
           refreshReviewBtn.disabled = false;
         }
@@ -1121,7 +1500,13 @@
         }
       });
 
-      refreshReviewBtn?.addEventListener('click', refreshRestaurantReview);
+      refreshReviewBtn?.addEventListener('click', () => refreshRestaurantReview());
+      changeReviewIdentityBtn?.addEventListener('click', identifyRestaurantReview);
+      reviewIdentityClose?.addEventListener('click', closeReviewIdentityModal);
+      reviewIdentityOverlay?.addEventListener('click', closeReviewIdentityModal);
+      mobileReviewBtn?.addEventListener('click', openMobileReviewModal);
+      mobileReviewClose?.addEventListener('click', closeMobileReviewModal);
+      mobileReviewOverlay?.addEventListener('click', closeMobileReviewModal);
 
       // 深色模式切換
       const htmlElement = document.documentElement;
@@ -1242,6 +1627,12 @@
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && menuModal && !menuModal.classList.contains('hidden')) {
           closeMenuModal();
+        }
+        if (e.key === 'Escape' && reviewIdentityModal && !reviewIdentityModal.classList.contains('hidden')) {
+          closeReviewIdentityModal();
+        }
+        if (e.key === 'Escape' && mobileReviewModal && !mobileReviewModal.classList.contains('hidden')) {
+          closeMobileReviewModal();
         }
       });
 

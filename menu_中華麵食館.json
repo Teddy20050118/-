@@ -1,0 +1,602 @@
+{
+  "schemaVersion": 2,
+  "name": "中華麵食館",
+  "source": "user_photo_vlm",
+  "source_type": "menu",
+  "confirmedAt": "2026-07-20T13:16:44.003805+00:00",
+  "quality": {
+    "score": 0.7,
+    "priceCoverage": 1.0,
+    "itemCount": 31,
+    "conflictCount": 3,
+    "modelFallback": true
+  },
+  "identity": {
+    "userHint": "",
+    "detectedName": "中餐館",
+    "candidates": [
+      "中餐館"
+    ],
+    "candidateInferred": false,
+    "menuType": "chinese",
+    "confirmedName": "中華麵食館"
+  },
+  "identityConflict": false,
+  "models": {
+    "overview": "mistral-small-4",
+    "ocrRequested": "gemma-4-31b",
+    "ocr": "mistral-small-4",
+    "verify": "mistral-small-4"
+  },
+  "sourceBlocks": [
+    {
+      "id": "tile-1",
+      "box": [
+        0,
+        0,
+        532,
+        1120
+      ]
+    },
+    {
+      "id": "tile-2",
+      "box": [
+        418,
+        0,
+        951,
+        1120
+      ]
+    },
+    {
+      "id": "tile-3",
+      "box": [
+        0,
+        880,
+        532,
+        2000
+      ]
+    },
+    {
+      "id": "tile-4",
+      "box": [
+        418,
+        880,
+        951,
+        2000
+      ]
+    }
+  ],
+  "warnings": [
+    "有 3 組 OCR 候選曾發生衝突，請確認摘要",
+    "主要 OCR 模型 gemma-4-31b 無法使用，本張圖片已改由 mistral-small-4 辨識"
+  ],
+  "menu_items": [
+    {
+      "id": "item-001",
+      "name": "切仔麵",
+      "price": 35.0,
+      "sources": [
+        {
+          "block": "tile-1",
+          "box": [
+            0,
+            0,
+            532,
+            1120
+          ]
+        }
+      ],
+      "category": "餐食類"
+    },
+    {
+      "id": "item-002",
+      "name": "米粉湯",
+      "price": 35.0,
+      "sources": [
+        {
+          "block": "tile-1",
+          "box": [
+            0,
+            0,
+            532,
+            1120
+          ]
+        }
+      ],
+      "category": "餐食類"
+    },
+    {
+      "id": "item-003",
+      "name": "陽春麵",
+      "price": 35.0,
+      "sources": [
+        {
+          "block": "tile-1",
+          "box": [
+            0,
+            0,
+            532,
+            1120
+          ]
+        }
+      ],
+      "category": "餐食類"
+    },
+    {
+      "id": "item-004",
+      "name": "麻辣麵",
+      "price": 45.0,
+      "sources": [
+        {
+          "block": "tile-1",
+          "box": [
+            0,
+            0,
+            532,
+            1120
+          ]
+        }
+      ],
+      "category": "餐食類"
+    },
+    {
+      "id": "item-005",
+      "name": "酸辣麵",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-1",
+          "box": [
+            0,
+            0,
+            532,
+            1120
+          ]
+        }
+      ],
+      "category": "餐食類"
+    },
+    {
+      "id": "item-006",
+      "name": "大腸麵",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-1",
+          "box": [
+            0,
+            0,
+            532,
+            1120
+          ]
+        }
+      ],
+      "category": "餐食類"
+    },
+    {
+      "id": "item-007",
+      "name": "酸辣粉",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-1",
+          "box": [
+            0,
+            0,
+            532,
+            1120
+          ]
+        }
+      ],
+      "category": "餐食類"
+    },
+    {
+      "id": "item-008",
+      "name": "餛飩麵",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-1",
+          "box": [
+            0,
+            0,
+            532,
+            1120
+          ]
+        }
+      ],
+      "category": "餐食類"
+    },
+    {
+      "id": "item-009",
+      "name": "椒菜肉絲麵",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-1",
+          "box": [
+            0,
+            0,
+            532,
+            1120
+          ]
+        }
+      ],
+      "category": "餐食類"
+    },
+    {
+      "id": "item-010",
+      "name": "蒜肉飯",
+      "price": 20.0,
+      "sources": [
+        {
+          "block": "tile-2",
+          "box": [
+            418,
+            0,
+            951,
+            1120
+          ]
+        }
+      ],
+      "category": "飯"
+    },
+    {
+      "id": "item-011",
+      "name": "炒肉飯",
+      "price": 35.0,
+      "sources": [
+        {
+          "block": "tile-2",
+          "box": [
+            418,
+            0,
+            951,
+            1120
+          ]
+        }
+      ],
+      "category": "飯"
+    },
+    {
+      "id": "item-012",
+      "name": "豬肝飯",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-2",
+          "box": [
+            418,
+            0,
+            951,
+            1120
+          ]
+        }
+      ],
+      "category": "飯"
+    },
+    {
+      "id": "item-013",
+      "name": "蒜肉飯餐",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-2",
+          "box": [
+            418,
+            0,
+            951,
+            1120
+          ]
+        }
+      ],
+      "category": "飯餐"
+    },
+    {
+      "id": "item-014",
+      "name": "炒肉飯餐",
+      "price": 65.0,
+      "sources": [
+        {
+          "block": "tile-2",
+          "box": [
+            418,
+            0,
+            951,
+            1120
+          ]
+        }
+      ],
+      "category": "飯餐"
+    },
+    {
+      "id": "item-015",
+      "name": "豬肝飯餐",
+      "price": 80.0,
+      "sources": [
+        {
+          "block": "tile-2",
+          "box": [
+            418,
+            0,
+            951,
+            1120
+          ]
+        }
+      ],
+      "category": "飯餐"
+    },
+    {
+      "id": "item-016",
+      "name": "蛋花湯",
+      "price": 15.0,
+      "sources": [
+        {
+          "block": "tile-2",
+          "box": [
+            418,
+            0,
+            951,
+            1120
+          ]
+        }
+      ],
+      "category": "湯"
+    },
+    {
+      "id": "item-017",
+      "name": "大蒜飯",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-3",
+          "box": [
+            0,
+            880,
+            532,
+            2000
+          ]
+        }
+      ],
+      "category": "主食類"
+    },
+    {
+      "id": "item-018",
+      "name": "酸辣飯",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-3",
+          "box": [
+            0,
+            880,
+            532,
+            2000
+          ]
+        }
+      ],
+      "category": "主食類"
+    },
+    {
+      "id": "item-019",
+      "name": "餛飩飯",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-3",
+          "box": [
+            0,
+            880,
+            532,
+            2000
+          ]
+        }
+      ],
+      "category": "主食類"
+    },
+    {
+      "id": "item-020",
+      "name": "椰菜肉絲飯",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-3",
+          "box": [
+            0,
+            880,
+            532,
+            2000
+          ]
+        }
+      ],
+      "category": "主食類"
+    },
+    {
+      "id": "item-021",
+      "name": "胡蘿蔔粥",
+      "price": 55.0,
+      "sources": [
+        {
+          "block": "tile-3",
+          "box": [
+            0,
+            880,
+            532,
+            2000
+          ]
+        }
+      ],
+      "category": "主食類"
+    },
+    {
+      "id": "item-022",
+      "name": "紅油灼手",
+      "price": 40.0,
+      "sources": [
+        {
+          "block": "tile-3",
+          "box": [
+            0,
+            880,
+            532,
+            2000
+          ]
+        }
+      ],
+      "category": "餃子類"
+    },
+    {
+      "id": "item-023",
+      "name": "高麗菜水餃(10粒)",
+      "price": 45.0,
+      "sources": [
+        {
+          "block": "tile-3",
+          "box": [
+            0,
+            880,
+            532,
+            2000
+          ]
+        }
+      ],
+      "category": "餃子類"
+    },
+    {
+      "id": "item-024",
+      "name": "韭菜水餃(10粒)",
+      "price": 45.0,
+      "sources": [
+        {
+          "block": "tile-3",
+          "box": [
+            0,
+            880,
+            532,
+            2000
+          ]
+        }
+      ],
+      "category": "餃子類"
+    },
+    {
+      "id": "item-025",
+      "name": "酸辣湯餃(6粒)",
+      "price": 50.0,
+      "sources": [
+        {
+          "block": "tile-3",
+          "box": [
+            0,
+            880,
+            532,
+            2000
+          ]
+        }
+      ],
+      "category": "餃子類"
+    },
+    {
+      "id": "item-026",
+      "name": "紫菜湯",
+      "price": 15.0,
+      "sources": [
+        {
+          "block": "tile-4",
+          "box": [
+            418,
+            880,
+            951,
+            2000
+          ]
+        }
+      ],
+      "category": "粵菜類"
+    },
+    {
+      "id": "item-027",
+      "name": "蚝九湯",
+      "price": 15.0,
+      "sources": [
+        {
+          "block": "tile-4",
+          "box": [
+            418,
+            880,
+            951,
+            2000
+          ]
+        }
+      ],
+      "category": "粵菜類"
+    },
+    {
+      "id": "item-028",
+      "name": "酸辣湯",
+      "price": 30.0,
+      "sources": [
+        {
+          "block": "tile-4",
+          "box": [
+            418,
+            880,
+            951,
+            2000
+          ]
+        }
+      ],
+      "category": "粵菜類"
+    },
+    {
+      "id": "item-029",
+      "name": "餃肚湯",
+      "price": 30.0,
+      "sources": [
+        {
+          "block": "tile-4",
+          "box": [
+            418,
+            880,
+            951,
+            2000
+          ]
+        }
+      ],
+      "category": "粵菜類"
+    },
+    {
+      "id": "item-030",
+      "name": "椰菜肉絲湯",
+      "price": 30.0,
+      "sources": [
+        {
+          "block": "tile-4",
+          "box": [
+            418,
+            880,
+            951,
+            2000
+          ]
+        }
+      ],
+      "category": "粵菜類"
+    },
+    {
+      "id": "item-031",
+      "name": "滷菜芽",
+      "price": 30.0,
+      "sources": [
+        {
+          "block": "tile-4",
+          "box": [
+            418,
+            880,
+            951,
+            2000
+          ]
+        }
+      ],
+      "category": "小炒類"
+    }
+  ]
+}

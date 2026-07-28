@@ -1,6 +1,6 @@
 #import
 from __future__ import annotations
-import os, json, re, shutil, subprocess, random, time
+import os, json, re, shutil, subprocess, time
 from typing import Dict, List, Optional, TypedDict, Literal, Tuple
 
 
@@ -501,8 +501,8 @@ def _fallback_format(rec: Dict[str, object]) -> str:
         section_key = classify_section(item)
         sections.setdefault(section_key, {"title": "其他", "items": []})["items"].append(entry)
 
-    service_fee = round(subtotal * 0.1, 1)
-    total = subtotal + service_fee
+    # 菜單未明確提供服務費資訊時，不應自行假設 10%。
+    total = subtotal
 
     lines: List[str] = []
 
@@ -533,7 +533,6 @@ def _fallback_format(rec: Dict[str, object]) -> str:
     lines.append("")
     lines.append(" 預算試算")
     lines.append(f"餐點小計：約 $ {subtotal:.0f}")
-    lines.append(f"10% 服務費：約 $ {service_fee:.0f}")
     lines.append(f"總計：約 $ {total:.0f}")
     if isinstance(budget, (int, float)):
         diff = float(budget) - total
@@ -570,14 +569,16 @@ def _build_recommendation_prompt(rec: Dict[str, object], user_input: str) -> str
     people     = meta.get("people")
     need_drink = meta.get("needDrink", False)
 
-    # 計算總價（含 10% 服務費）
+    # 只計算菜單品項小計；沒有服務費資料就不猜測。
     subtotal = sum(
         float(it.get("price") or 0)
         for it in items
         if isinstance(it, dict) and it.get("price") is not None
     )
-    service = round(subtotal * 0.1, 1)
-    total   = subtotal + service
+    total = subtotal
+    price_complete = bool(items) and all(
+        isinstance(it, dict) and it.get("price") is not None for it in items
+    )
 
     items_json = json.dumps(items, ensure_ascii=False, indent=2)
 
@@ -594,8 +595,7 @@ def _build_recommendation_prompt(rec: Dict[str, object], user_input: str) -> str
 - 預算：{f"NT${int(budget)}" if budget else "未指定"}
 - 是否需要飲料：{"需要" if need_drink else "未特別需要"}
 - 小計：NT${subtotal:.0f}
-- 服務費估算：NT${service:.0f}
-- 合計估算：NT${total:.0f}
+- 合計估算：{f"NT${total:.0f}" if price_complete else "部分品項缺價，無法精確估算"}
 
 回答要求：
 - 不要用固定模板、表格、制式標題或「以下是推薦」這種 AI 感開場。
@@ -604,6 +604,7 @@ def _build_recommendation_prompt(rec: Dict[str, object], user_input: str) -> str
 - 先講最推薦怎麼點，再自然補充為什麼適合他的預算、口味或人數。
 - 如果有預算，請自然提到大概會不會超出。
 - 如果資料不足或價格缺失，要誠實說明，不要編造。
+- 不得提到服務費，因為菜單資料沒有提供服務費規則。
 """
 
     return f"""你是一位親切的台灣中文點餐助理。請根據以下推薦清單，用自然、有溫度的繁體中文回覆使用者。
@@ -619,8 +620,7 @@ def _build_recommendation_prompt(rec: Dict[str, object], user_input: str) -> str
 - 預算：{f"NT${int(budget)}" if budget else "未指定"}
 - 需要飲料：{"是" if need_drink else "否"}
 - 餐點小計：約 NT${subtotal:.0f}
-- 10% 服務費：約 NT${service:.0f}
-- 總計：約 NT${total:.0f}
+- 總計：約 NT${total:.0f}（未加計菜單未提供的費用）
 
 【回覆要求】
 1. 開場要有溫度，自然呼應使用者的需求，不要複製貼上需求文字
@@ -630,6 +630,32 @@ def _build_recommendation_prompt(rec: Dict[str, object], user_input: str) -> str
 5. 全程繁體中文，語氣像真人朋友，不要條列太多符號
 6. 控制在 300 字以內
 """
+
+
+def _validated_fallback_format(rec: Dict[str, object]) -> str:
+    """Render only validated menu items and never invent prices or fees."""
+    items = rec.get("items") if isinstance(rec, dict) else []
+    if not isinstance(items, list) or not items:
+        notes = str(rec.get("notes") or "") if isinstance(rec, dict) else ""
+        return notes or "目前沒有符合預算與忌口的主餐，可以調整條件後再試一次。"
+    labels: List[str] = []
+    prices: List[Optional[float]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "菜品")
+        price = item.get("price")
+        numeric = float(price) if isinstance(price, (int, float)) else None
+        prices.append(numeric)
+        labels.append(f"{name}（{f'NT${numeric:.0f}' if numeric is not None else '價格未辨識'}）")
+    if not labels:
+        return "目前沒有符合條件的主餐。"
+    reply = f"我會先推薦你點{'、'.join(labels)}，這些品項都已從目前菜單核對過。"
+    if prices and all(value is not None for value in prices):
+        reply += f" 菜單小計約 NT${sum(value for value in prices if value is not None):.0f}；菜單沒有服務費資訊，所以不另外估算。"
+    else:
+        reply += " 因部分價格看不清，現在無法精確估算總額；菜單也沒有提供服務費規則。"
+    return reply
 
 
 def generate_ai_reply(
@@ -647,7 +673,8 @@ def generate_ai_reply(
     """
     from ollama_fuc import chat as _ollama_chat
 
-    mdl    = model or DEFAULT_MODEL
+    mdl = model or os.environ.get("RESPONSE_MODEL") or DEFAULT_MODEL
+    fallback_model = os.environ.get("FAST_FALLBACK_MODEL", "vibe")
     prompt = _build_recommendation_prompt(rec, user_input)
 
     try:
@@ -655,19 +682,32 @@ def generate_ai_reply(
             [{"role": "user", "content": prompt}],
             model=mdl,
             timeout=timeout,
+            temperature=float(os.environ.get("RESPONSE_TEMPERATURE", "0.5")),
         )
         cleaned = response.strip() if isinstance(response, str) else ""
         if cleaned:
             return cleaned
         print(" [generate_ai_reply] LLM 返回空回覆，降級使用模板")
-        return _fallback_format(rec)
+        return _validated_fallback_format(rec)
     except Exception as e:
-        print(f" [generate_ai_reply] 錯誤: {e}，降級使用模板")
-        return _fallback_format(rec)
+        print(f" [generate_ai_reply] 主要回覆模型錯誤: {e}，嘗試快速備援")
+        if fallback_model and fallback_model != mdl:
+            try:
+                response = _ollama_chat(
+                    [{"role": "user", "content": prompt}],
+                    model=fallback_model,
+                    timeout=min(timeout, 60.0),
+                    temperature=float(os.environ.get("RESPONSE_TEMPERATURE", "0.5")),
+                )
+                if isinstance(response, str) and response.strip():
+                    return response.strip()
+            except Exception as fallback_error:
+                print(f" [generate_ai_reply] 備援模型錯誤: {fallback_error}")
+        return _validated_fallback_format(rec)
 
 
 # 向後相容：舊名稱保留為 alias，避免其他地方呼叫出錯
-format_recommend_text = _fallback_format
+format_recommend_text = _validated_fallback_format
 
 
 # 既有骨架占位

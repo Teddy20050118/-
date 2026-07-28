@@ -1,0 +1,56 @@
+{
+  "name": "麥當勞",
+  "source": "user_photo_vlm",
+  "source_type": "menu",
+  "confidence": 0.9,
+  "warnings": [
+    "價格模糊不清，請確認價格。"
+  ],
+  "menu_items": [
+    {
+      "name": "早餐A組",
+      "price": null,
+      "category": "早餐"
+    },
+    {
+      "name": "早餐B組",
+      "price": null,
+      "category": "早餐"
+    },
+    {
+      "name": "早餐C組",
+      "price": null,
+      "category": "早餐"
+    },
+    {
+      "name": "巨無霸",
+      "price": null,
+      "category": "漢堡"
+    },
+    {
+      "name": "麥香雞",
+      "price": null,
+      "category": "漢堡"
+    },
+    {
+      "name": "麥克雞塊",
+      "price": null,
+      "category": "套餐"
+    },
+    {
+      "name": "麥克雙層牛肉漢堡",
+      "price": null,
+      "category": "套餐"
+    },
+    {
+      "name": "可樂",
+      "price": null,
+      "category": "飲料"
+    },
+    {
+      "name": "雪碧",
+      "price": null,
+      "category": "飲料"
+    }
+  ]
+}
